@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B0F14" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Dual Nanogrid Monitor — Real-time telemetry for solar PV, battery storage, and inter-tie DC bus power transfer between Node 1 and Node 2." />
+    <title>Dual Nanogrid Monitor — Solar + Battery Telemetry</title>
+    
+    <!-- Favicon and Manifest -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Google Fonts: Inter with tabular numbers -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <style>
+      /* Immediate dark background to prevent any white flash during initial paint */
+      html, body {
+        background-color: #0B0F14;
+        color: #F1F5F9;
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-variant-numeric: tabular-nums;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        overflow-x: hidden;
+      }
+    </style>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-container">
+      
+      <!-- Top Slim Navigation Header -->
+      <header class="top-nav">
+        <div class="top-nav-inner">
+          <div class="brand">
+            <div class="brand-logo-wrap">
+              <svg class="brand-logo-svg" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="8" fill="#121820" stroke="#1E2733"/>
+                <circle cx="16" cy="16" r="3" fill="#22D3EE" />
+                <path d="M7 16 H25" stroke="#22D3EE" stroke-width="1.8" stroke-linecap="round" opacity="0.6"/>
+                <path d="M10 11 L10 21" stroke="#38BDF8" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M22 11 L22 21" stroke="#10B981" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="brand-text">
+              <h1 class="brand-title">Dual Nanogrid <span class="brand-subtitle-badge">Monitor</span></h1>
+              <span class="brand-caption">Solar + Battery DC Telemetry</span>
+            </div>
+          </div>
+
+          <!-- Desktop Navigation Tabs (integrated in header for >= 768px) -->
+          <nav class="desktop-nav-tabs" aria-label="Main Navigation">
+            <button class="nav-tab-btn active" data-tab="live" id="desktopTabLive">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <span>Live Telemetry</span>
+            </button>
+            <button class="nav-tab-btn" data-tab="charts" id="desktopTabCharts">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <span>System Charts</span>
+            </button>
+          </nav>
+
+          <!-- System Status Pill & Demo/Live Toggle -->
+          <div class="top-nav-actions">
+            <!-- Mode Toggle Pill (Demo vs Live) -->
+            <button class="mode-toggle-btn" id="modeToggleBtn" title="Switch between Demo Simulation and Live Backend Polling">
+              <span class="mode-indicator-dot"></span>
+              <span class="mode-label" id="modeLabelText">Live Backend</span>
+            </button>
+
+            <!-- Overall System Freshness Status Pill -->
+            <div class="system-status-pill status-live" id="systemStatusPill" title="Overall System Telemetry Status">
+              <span class="pulse-dot"></span>
+              <span class="system-status-text" id="systemStatusText">Live</span>
+            </div>
+
+            <!-- API / Curl Info Modal Trigger Button -->
+            <button class="icon-btn" id="apiModalOpenBtn" title="API Ingestion & Curl Test Info" aria-label="API Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+
+        <!-- ========================================== -->
+        <!-- SCREEN 1: LIVE TELEMETRY SCREEN           -->
+        <!-- ========================================== -->
+        <section id="screenLive" class="view-screen active">
+
+          <!-- Mobile Node Switcher (Visible only on < 768px) -->
+          <div class="mobile-node-switcher" id="mobileNodeSwitcher">
+            <button class="node-switch-chip active" data-node-filter="all">Both Nodes</button>
+            <button class="node-switch-chip" data-node-filter="1">Node 1</button>
+            <button class="node-switch-chip" data-node-filter="2">Node 2</button>
+          </div>
+
+          <!-- Combined Shared Inter-Tie DC Bus Panel -->
+          <div class="combined-bus-panel" id="combinedBusPanel">
+            <div class="combined-bus-header">
+              <div class="bus-badge-group">
+                <span class="bus-icon-dot"></span>
+                <span class="bus-panel-title">SHARED DC INTER-TIE BUS</span>
+              </div>
+              <div class="bus-metric-pill" id="busVoltagePill">
+                <span class="metric-label">V_bus:</span>
+                <span class="metric-value" id="combinedBusVoltage">12.80 V</span>
+              </div>
+            </div>
+
+            <div class="combined-bus-flow-container">
+              <!-- Left Node Pin -->
+              <div class="bus-flow-endpoint endpoint-node1">
+                <span class="endpoint-tag">NODE 1</span>
+                <span class="endpoint-status" id="node1TieAction">Idle</span>
+              </div>
+
+              <!-- Animated Directional Transfer Channel -->
+              <div class="bus-transfer-channel" id="busTransferChannel">
+                <div class="channel-track">
+                  <div class="flow-particles particle-flow" id="busParticles">
+                    <span class="particle"></span>
+                    <span class="particle"></span>
+                    <span class="particle"></span>
+                    <span class="particle"></span>
+                  </div>
+                </div>
+                <div class="transfer-stats-badge" id="busTransferStats">
+                  <span class="transfer-arrow-icon" id="transferArrow">⟷</span>
+                  <span class="transfer-wattage" id="transferWattage">0.0 W</span>
+                  <span class="transfer-direction-phrase" id="transferPhrase">Bus Balanced</span>
+                </div>
+              </div>
+
+              <!-- Right Node Pin -->
+              <div class="bus-flow-endpoint endpoint-node2">
+                <span class="endpoint-tag">NODE 2</span>
+                <span class="endpoint-status" id="node2TieAction">Idle</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid of Node Cards -->
+          <div class="nodes-grid-layout" id="nodesGridLayout">
+            
+            <!-- ========================================== -->
+            <!-- NODE 1 CARD                                -->
+            <!-- ========================================== -->
+            <article class="node-card" id="cardNode1" data-node="1">
+              
+              <!-- Safety Lockout Banner (Hidden by default, shown when lockout===true) -->
+              <div class="lockout-banner" id="node1LockoutBanner" style="display: none;">
+                <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span class="banner-msg">SAFETY LOCKOUT ACTIVE — All relays open for 60 s</span>
+              </div>
+
+              <!-- Amber Current Limit Warning Banner -->
+              <div class="amber-warning-banner" id="node1CurrentWarning" style="display: none;">
+                <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span class="banner-msg" id="node1CurrentWarningText">High current (> 0.6 A) — approaching 0.8 A sensor limit</span>
+              </div>
+
+              <!-- Amber Battery Voltage Warning Banner -->
+              <div class="amber-warning-banner" id="node1VoltageWarning" style="display: none;">
+                <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span class="banner-msg" id="node1VoltageWarningText">Battery voltage warning (outside 11.0–14.6 V)</span>
+              </div>
+
+              <!-- Offline Banner (Shown when > 30s) -->
+              <div class="offline-banner" id="node1OfflineBanner" style="display: none;">
+                <span class="offline-dot"></span>
+                <span>Offline — no telemetry received from this node</span>
+              </div>
+
+              <!-- Card Header -->
+              <div class="node-card-header">
+                <div class="node-identity">
+                  <div class="node-badge-icon node1-accent">N1</div>
+                  <div>
+                    <h2 class="node-card-title">Node 1 Nanogrid</h2>
+                    <span class="node-freshness-text" id="node1Freshness">Updated 0s ago</span>
+                  </div>
+                </div>
+
+                <div class="node-header-badges">
+                  <span class="freshness-badge badge-live" id="node1FreshnessBadge">Live</span>
+                </div>
+              </div>
+
+              <!-- Status Strip (3 Pills) -->
+              <div class="node-status-strip">
+                <!-- 1. Local Source -->
+                <div class="status-chip chip-source" id="node1ChipSource">
+                  <span class="chip-dot dot-cyan"></span>
+                  <span class="chip-text" id="node1TextSource">Source: PV</span>
+                </div>
+                <!-- 2. Tie Status -->
+                <div class="status-chip chip-tie" id="node1ChipTie">
+                  <span class="chip-dot dot-blue"></span>
+                  <span class="chip-text" id="node1TextTie">Tie: Exporting</span>
+                </div>
+                <!-- 3. PV Health -->
+                <div class="status-chip chip-pv" id="node1ChipPv">
+                  <span class="chip-dot dot-green"></span>
+                  <span class="chip-text" id="node1TextPv">PV Rail OK</span>
+                </div>
+              </div>
+
+              <!-- Telemetry Blocks Container -->
+              <div class="node-blocks-grid">
+                
+                <!-- Battery Block + SOC Ring -->
+                <div class="telemetry-block block-battery">
+                  <div class="block-header">
+                    <div class="block-title-wrap">
+                      <svg class="block-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
+                        <rect x="2" y="7" width="16" height="10" rx="2"/>
+                        <line x1="20" y1="10" x2="20" y2="14"/>
+                        <line x1="6" y1="11" x2="6" y2="13"/>
+                        <line x1="10" y1="11" x2="10" y2="13"/>
+                      </svg>
+                      <span class="block-title">Battery Storage</span>
+                    </div>
+                    <span class="block-state-badge badge-green" id="node1BatState">Charging</span>
+                  </div>
+
+                  <div class="battery-content-split">
+                    <!-- Circular SVG SOC Gauge -->
+                    <div class="soc-gauge-wrapper">
+                      <svg class="soc-gauge-svg" viewBox="0 0 100 100">
+                        <circle class="gauge-bg-ring" cx="50" cy="50" r="40" />
+                        <circle class="gauge-progress-ring" id="node1SocRing" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="50" />
+                      </svg>
+                      <div class="soc-gauge-inner">
+                        <span class="soc-number" id="node1SocValue">82%</span>
+                        <span class="soc-label">estimated</span>
+                      </div>
+                    </div>
+
+                    <!-- Battery Numeric Metrics -->
+                    <div class="block-metrics-list">
+                      <div class="metric-row">
+                        <span class="metric-key">Voltage (V_bat)</span>
+                        <span class="metric-val text-green" id="node1Vbat">12.65 V</span>
+                      </div>
+                      <div class="metric-row">
+                        <span class="metric-key">Net Current (I_bat)</span>
+                        <span class="metric-val text-highlight" id="node1Ibat">+0.32 A</span>
+                      </div>
+                      <div class="metric-row">
+                        <span class="metric-key">Battery Power</span>
+                        <span class="metric-val" id="node1BatPower">4.05 W</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Subtle Sparkline Background/Footer -->
+                  <div class="block-sparkline-wrap">
+                    <svg class="sparkline-svg" id="node1BatSparkline" preserveAspectRatio="none" viewBox="0 0 200 40"></svg>
+                  </div>
+                </div>
+
+                <!-- PV Block (After Converter) -->
+                <div class="telemetry-block block-pv">
+                  <div class="block-header">
+                    <div class="block-title-wrap">
+                      <svg class="block-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41"/>
+                      </svg>
+                      <span class="block-title">PV Rail (After Converter)</span>
+                    </div>
+                    <span class="block-state-badge badge-cyan" id="node1PvHealth">Healthy</span>
+                  </div>
+
+                  <div class="block-metrics-list">
+                    <div class="metric-row">
+                      <span class="metric-key">Rail Voltage (V_pv)</span>
+                      <span class="metric-val text-cyan" id="node1Vpv">17.80 V</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Rail Current (I_pv)</span>
+                      <span class="metric-val text-cyan" id="node1Ipv">0.45 A</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Solar Generation</span>
+                      <span class="metric-val text-highlight" id="node1PvPower">8.01 W</span>
+                    </div>
+                  </div>
+
+                  <div class="block-sparkline-wrap">
+                    <svg class="sparkline-svg" id="node1PvSparkline" preserveAspectRatio="none" viewBox="0 0 200 40"></svg>
+                  </div>
+                </div>
+
+                <!-- Shared Bus Block -->
+                <div class="telemetry-block block-bus">
+                  <div class="block-header">
+                    <div class="block-title-wrap">
+                      <svg class="block-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <circle cx="6" cy="12" r="3"/>
+                        <circle cx="18" cy="12" r="3"/>
+                      </svg>
+                      <span class="block-title">Shared Tie Connection</span>
+                    </div>
+                    <span class="block-state-badge badge-blue" id="node1BusTransferPhrase">Exporting 1.92 W</span>
+                  </div>
+
+                  <div class="block-metrics-list">
+                    <div class="metric-row">
+                      <span class="metric-key">Bus Voltage (V_bus)</span>
+                      <span class="metric-val text-violet" id="node1Vbus">12.80 V</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Tie Current (I_bus)</span>
+                      <span class="metric-val text-blue" id="node1Ibus">-0.15 A</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Tie Power Flow</span>
+                      <span class="metric-val" id="node1BusPower">1.92 W</span>
+                    </div>
+                  </div>
+
+                  <div class="block-sparkline-wrap">
+                    <svg class="sparkline-svg" id="node1BusSparkline" preserveAspectRatio="none" viewBox="0 0 200 40"></svg>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Per-Node Energy Flow Diagram (Inline SVG) -->
+              <div class="flow-diagram-container">
+                <div class="diagram-title">DYNAMIC ENERGY-FLOW ROUTING</div>
+                <div class="svg-diagram-wrapper">
+                  <svg class="node-flow-svg" id="node1FlowSvg" viewBox="0 0 460 160" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <linearGradient id="pvLineGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.9"/>
+                        <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.9"/>
+                      </linearGradient>
+                      <linearGradient id="batLineGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#10B981" stop-opacity="0.9"/>
+                        <stop offset="100%" stop-color="#34D399" stop-opacity="0.9"/>
+                      </linearGradient>
+                      <linearGradient id="tieLineGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.9"/>
+                        <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0.9"/>
+                      </linearGradient>
+                      <filter id="glow1" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="2" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                      </filter>
+                    </defs>
+
+                    <!-- Path: PV (60, 45) -> Local Bus (230, 45) -->
+                    <path class="flow-track" d="M 95 45 L 205 45" />
+                    <path class="flow-active-line" id="n1PvFlowLine" d="M 95 45 L 205 45" stroke="#22D3EE" />
+
+                    <!-- Path: Local Bus (230, 45) <-> Shared Tie Bus (400, 45) -->
+                    <path class="flow-track" d="M 255 45 L 365 45" />
+                    <path class="flow-active-line" id="n1TieFlowLine" d="M 255 45 L 365 45" stroke="#3B82F6" />
+
+                    <!-- Path: Local Bus (230, 45) <-> Battery Pack (230, 125) -->
+                    <path class="flow-track" d="M 230 65 L 230 115" />
+                    <path class="flow-active-line" id="n1BatFlowLine" d="M 230 65 L 230 115" stroke="#10B981" />
+
+                    <!-- NODE 1: PV Array Element (Left) -->
+                    <g transform="translate(60, 45)" class="diagram-node-group">
+                      <rect x="-35" y="-22" width="70" height="44" rx="8" fill="#121820" stroke="#1E2733" stroke-width="1.5"/>
+                      <circle cx="0" cy="-3" r="8" fill="#0C1B2A" stroke="#22D3EE" stroke-width="1.5"/>
+                      <text x="0" y="16" text-anchor="middle" font-size="9" font-weight="600" fill="#8B9BB4">PV ARRAY</text>
+                    </g>
+
+                    <!-- NODE 2: Local Node Bus Element (Center Top) -->
+                    <g transform="translate(230, 45)" class="diagram-node-group">
+                      <rect x="-32" y="-22" width="64" height="44" rx="8" fill="#121820" stroke="#334155" stroke-width="1.5"/>
+                      <circle cx="0" cy="-3" r="5" fill="#22D3EE" filter="url(#glow1)"/>
+                      <text x="0" y="16" text-anchor="middle" font-size="9" font-weight="600" fill="#94A3B8">LOCAL BUS</text>
+                    </g>
+
+                    <!-- NODE 3: Battery Pack Element (Center Bottom) -->
+                    <g transform="translate(230, 130)" class="diagram-node-group">
+                      <rect x="-35" y="-20" width="70" height="40" rx="8" fill="#121820" stroke="#1E2733" stroke-width="1.5"/>
+                      <rect x="-10" y="-12" width="20" height="12" rx="2" fill="#0C1F1D" stroke="#10B981" stroke-width="1.2"/>
+                      <text x="0" y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#8B9BB4">BATTERY</text>
+                    </g>
+
+                    <!-- NODE 4: Shared Inter-Tie Element (Right) -->
+                    <g transform="translate(400, 45)" class="diagram-node-group">
+                      <rect x="-35" y="-22" width="70" height="44" rx="8" fill="#121820" stroke="#1E2733" stroke-width="1.5"/>
+                      <path d="M-8 -3 L8 -3 M-4 -7 L-8 -3 L-4 1 M4 -7 L8 -3 L4 1" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round"/>
+                      <text x="0" y="16" text-anchor="middle" font-size="9" font-weight="600" fill="#8B9BB4">TIE BUS</text>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+
+            </article>
+
+            <!-- ========================================== -->
+            <!-- NODE 2 CARD                                -->
+            <!-- ========================================== -->
+            <article class="node-card" id="cardNode2" data-node="2">
+              
+              <!-- Safety Lockout Banner -->
+              <div class="lockout-banner" id="node2LockoutBanner" style="display: none;">
+                <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span class="banner-msg">SAFETY LOCKOUT ACTIVE — All relays open for 60 s</span>
+              </div>
+
+              <!-- Amber Current Limit Warning Banner -->
+              <div class="amber-warning-banner" id="node2CurrentWarning" style="display: none;">
+                <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span class="banner-msg" id="node2CurrentWarningText">High current (> 0.6 A) — approaching 0.8 A sensor limit</span>
+              </div>
+
+              <!-- Amber Battery Voltage Warning Banner -->
+              <div class="amber-warning-banner" id="node2VoltageWarning" style="display: none;">
+                <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span class="banner-msg" id="node2VoltageWarningText">Battery voltage warning (outside 11.0–14.6 V)</span>
+              </div>
+
+              <!-- Offline Banner -->
+              <div class="offline-banner" id="node2OfflineBanner" style="display: none;">
+                <span class="offline-dot"></span>
+                <span>Offline — no telemetry received from this node</span>
+              </div>
+
+              <!-- Card Header -->
+              <div class="node-card-header">
+                <div class="node-identity">
+                  <div class="node-badge-icon node2-accent">N2</div>
+                  <div>
+                    <h2 class="node-card-title">Node 2 Nanogrid</h2>
+                    <span class="node-freshness-text" id="node2Freshness">Updated 0s ago</span>
+                  </div>
+                </div>
+
+                <div class="node-header-badges">
+                  <span class="freshness-badge badge-live" id="node2FreshnessBadge">Live</span>
+                </div>
+              </div>
+
+              <!-- Status Strip (3 Pills) -->
+              <div class="node-status-strip">
+                <!-- 1. Local Source -->
+                <div class="status-chip chip-source" id="node2ChipSource">
+                  <span class="chip-dot dot-cyan"></span>
+                  <span class="chip-text" id="node2TextSource">Source: Battery</span>
+                </div>
+                <!-- 2. Tie Status -->
+                <div class="status-chip chip-tie" id="node2ChipTie">
+                  <span class="chip-dot dot-violet"></span>
+                  <span class="chip-text" id="node2TextTie">Tie: Importing</span>
+                </div>
+                <!-- 3. PV Health -->
+                <div class="status-chip chip-pv" id="node2ChipPv">
+                  <span class="chip-dot dot-amber"></span>
+                  <span class="chip-text" id="node2TextPv">PV Rail Low</span>
+                </div>
+              </div>
+
+              <!-- Telemetry Blocks Grid -->
+              <div class="node-blocks-grid">
+                
+                <!-- Battery Block + SOC Ring -->
+                <div class="telemetry-block block-battery">
+                  <div class="block-header">
+                    <div class="block-title-wrap">
+                      <svg class="block-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
+                        <rect x="2" y="7" width="16" height="10" rx="2"/>
+                        <line x1="20" y1="10" x2="20" y2="14"/>
+                        <line x1="6" y1="11" x2="6" y2="13"/>
+                        <line x1="10" y1="11" x2="10" y2="13"/>
+                      </svg>
+                      <span class="block-title">Battery Storage</span>
+                    </div>
+                    <span class="block-state-badge badge-amber" id="node2BatState">Discharging</span>
+                  </div>
+
+                  <div class="battery-content-split">
+                    <!-- Circular SVG SOC Gauge -->
+                    <div class="soc-gauge-wrapper">
+                      <svg class="soc-gauge-svg" viewBox="0 0 100 100">
+                        <circle class="gauge-bg-ring" cx="50" cy="50" r="40" />
+                        <circle class="gauge-progress-ring" id="node2SocRing" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="100" />
+                      </svg>
+                      <div class="soc-gauge-inner">
+                        <span class="soc-number" id="node2SocValue">65%</span>
+                        <span class="soc-label">estimated</span>
+                      </div>
+                    </div>
+
+                    <!-- Battery Numeric Metrics -->
+                    <div class="block-metrics-list">
+                      <div class="metric-row">
+                        <span class="metric-key">Voltage (V_bat)</span>
+                        <span class="metric-val text-green" id="node2Vbat">12.38 V</span>
+                      </div>
+                      <div class="metric-row">
+                        <span class="metric-key">Net Current (I_bat)</span>
+                        <span class="metric-val text-cyan" id="node2Ibat">-0.24 A</span>
+                      </div>
+                      <div class="metric-row">
+                        <span class="metric-key">Battery Power</span>
+                        <span class="metric-val" id="node2BatPower">2.97 W</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="block-sparkline-wrap">
+                    <svg class="sparkline-svg" id="node2BatSparkline" preserveAspectRatio="none" viewBox="0 0 200 40"></svg>
+                  </div>
+                </div>
+
+                <!-- PV Block (After Converter) -->
+                <div class="telemetry-block block-pv">
+                  <div class="block-header">
+                    <div class="block-title-wrap">
+                      <svg class="block-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41"/>
+                      </svg>
+                      <span class="block-title">PV Rail (After Converter)</span>
+                    </div>
+                    <span class="block-state-badge badge-amber" id="node2PvHealth">Inactive</span>
+                  </div>
+
+                  <div class="block-metrics-list">
+                    <div class="metric-row">
+                      <span class="metric-key">Rail Voltage (V_pv)</span>
+                      <span class="metric-val text-cyan" id="node2Vpv">4.20 V</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Rail Current (I_pv)</span>
+                      <span class="metric-val text-cyan" id="node2Ipv">0.00 A</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Solar Generation</span>
+                      <span class="metric-val text-highlight" id="node2PvPower">0.00 W</span>
+                    </div>
+                  </div>
+
+                  <div class="block-sparkline-wrap">
+                    <svg class="sparkline-svg" id="node2PvSparkline" preserveAspectRatio="none" viewBox="0 0 200 40"></svg>
+                  </div>
+                </div>
+
+                <!-- Shared Bus Block -->
+                <div class="telemetry-block block-bus">
+                  <div class="block-header">
+                    <div class="block-title-wrap">
+                      <svg class="block-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <circle cx="6" cy="12" r="3"/>
+                        <circle cx="18" cy="12" r="3"/>
+                      </svg>
+                      <span class="block-title">Shared Tie Connection</span>
+                    </div>
+                    <span class="block-state-badge badge-violet" id="node2BusTransferPhrase">Importing 1.92 W</span>
+                  </div>
+
+                  <div class="block-metrics-list">
+                    <div class="metric-row">
+                      <span class="metric-key">Bus Voltage (V_bus)</span>
+                      <span class="metric-val text-violet" id="node2Vbus">12.80 V</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Tie Current (I_bus)</span>
+                      <span class="metric-val text-violet" id="node2Ibus">+0.15 A</span>
+                    </div>
+                    <div class="metric-row">
+                      <span class="metric-key">Tie Power Flow</span>
+                      <span class="metric-val" id="node2BusPower">1.92 W</span>
+                    </div>
+                  </div>
+
+                  <div class="block-sparkline-wrap">
+                    <svg class="sparkline-svg" id="node2BusSparkline" preserveAspectRatio="none" viewBox="0 0 200 40"></svg>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Per-Node Energy Flow Diagram (Inline SVG) -->
+              <div class="flow-diagram-container">
+                <div class="diagram-title">DYNAMIC ENERGY-FLOW ROUTING</div>
+                <div class="svg-diagram-wrapper">
+                  <svg class="node-flow-svg" id="node2FlowSvg" viewBox="0 0 460 160" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Path: PV (60, 45) -> Local Bus (230, 45) -->
+                    <path class="flow-track" d="M 95 45 L 205 45" />
+                    <path class="flow-active-line" id="n2PvFlowLine" d="M 95 45 L 205 45" stroke="#22D3EE" />
+
+                    <!-- Path: Local Bus (230, 45) <-> Shared Tie Bus (400, 45) -->
+                    <path class="flow-track" d="M 255 45 L 365 45" />
+                    <path class="flow-active-line" id="n2TieFlowLine" d="M 255 45 L 365 45" stroke="#8B5CF6" />
+
+                    <!-- Path: Local Bus (230, 45) <-> Battery Pack (230, 125) -->
+                    <path class="flow-track" d="M 230 65 L 230 115" />
+                    <path class="flow-active-line" id="n2BatFlowLine" d="M 230 65 L 230 115" stroke="#10B981" />
+
+                    <!-- NODE 2: PV Array Element (Left) -->
+                    <g transform="translate(60, 45)" class="diagram-node-group">
+                      <rect x="-35" y="-22" width="70" height="44" rx="8" fill="#121820" stroke="#1E2733" stroke-width="1.5"/>
+                      <circle cx="0" cy="-3" r="8" fill="#0C1B2A" stroke="#22D3EE" stroke-width="1.5"/>
+                      <text x="0" y="16" text-anchor="middle" font-size="9" font-weight="600" fill="#8B9BB4">PV ARRAY</text>
+                    </g>
+
+                    <!-- NODE 2: Local Node Bus Element (Center Top) -->
+                    <g transform="translate(230, 45)" class="diagram-node-group">
+                      <rect x="-32" y="-22" width="64" height="44" rx="8" fill="#121820" stroke="#334155" stroke-width="1.5"/>
+                      <circle cx="0" cy="-3" r="5" fill="#8B5CF6"/>
+                      <text x="0" y="16" text-anchor="middle" font-size="9" font-weight="600" fill="#94A3B8">LOCAL BUS</text>
+                    </g>
+
+                    <!-- NODE 2: Battery Pack Element (Center Bottom) -->
+                    <g transform="translate(230, 130)" class="diagram-node-group">
+                      <rect x="-35" y="-20" width="70" height="40" rx="8" fill="#121820" stroke="#1E2733" stroke-width="1.5"/>
+                      <rect x="-10" y="-12" width="20" height="12" rx="2" fill="#0C1F1D" stroke="#10B981" stroke-width="1.2"/>
+                      <text x="0" y="13" text-anchor="middle" font-size="9" font-weight="600" fill="#8B9BB4">BATTERY</text>
+                    </g>
+
+                    <!-- NODE 2: Shared Inter-Tie Element (Right) -->
+                    <g transform="translate(400, 45)" class="diagram-node-group">
+                      <rect x="-35" y="-22" width="70" height="44" rx="8" fill="#121820" stroke="#1E2733" stroke-width="1.5"/>
+                      <path d="M-8 -3 L8 -3 M-4 -7 L-8 -3 L-4 1 M4 -7 L8 -3 L4 1" stroke="#8B5CF6" stroke-width="1.5" stroke-linecap="round"/>
+                      <text x="0" y="16" text-anchor="middle" font-size="9" font-weight="600" fill="#8B9BB4">TIE BUS</text>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+
+            </article>
+
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SCREEN 2: SYSTEM CHARTS SCREEN            -->
+        <!-- ========================================== -->
+        <section id="screenCharts" class="view-screen">
+          <div class="charts-screen-header">
+            <div>
+              <h2 class="section-title">Telemetry Analytics</h2>
+              <p class="section-caption">High-precision dual-node trend comparative history</p>
+            </div>
+
+            <!-- Time Range Selector Pills -->
+            <div class="time-range-selector" role="group" aria-label="Chart Time Range">
+              <button class="range-chip active" data-range="15m">Last 15m</button>
+              <button class="range-chip" data-range="1h">Last 1h</button>
+              <button class="range-chip" data-range="24h">Last 24h</button>
+            </div>
+          </div>
+
+          <!-- Legend Bar -->
+          <div class="charts-legend-bar">
+            <div class="legend-item">
+              <span class="legend-line legend-node1"></span>
+              <span class="legend-label">Node 1 (Solid)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line legend-node2"></span>
+              <span class="legend-label">Node 2 (Dashed)</span>
+            </div>
+          </div>
+
+          <!-- 4 Interactive High-DPI Charts Grid -->
+          <div class="charts-canvas-grid">
+            
+            <!-- Chart 1: Battery Voltage (vbat, V) -->
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div class="chart-card-title">
+                  <span class="chart-metric-dot dot-green"></span>
+                  <span>Battery Voltage (V_bat)</span>
+                </div>
+                <div class="chart-current-summary" id="chart1Summary">
+                  <span class="summary-n1">N1: 12.65 V</span>
+                  <span class="summary-n2">N2: 12.38 V</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container" id="canvasWrapVbat">
+                <canvas id="chartCanvasVbat"></canvas>
+                <div class="chart-tooltip" id="tooltipVbat" style="display: none;"></div>
+              </div>
+            </div>
+
+            <!-- Chart 2: State of Charge (soc, % estimated) -->
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div class="chart-card-title">
+                  <span class="chart-metric-dot dot-cyan"></span>
+                  <span>State of Charge (SOC % Estimated)</span>
+                </div>
+                <div class="chart-current-summary" id="chart2Summary">
+                  <span class="summary-n1">N1: 82.0%</span>
+                  <span class="summary-n2">N2: 65.0%</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container" id="canvasWrapSoc">
+                <canvas id="chartCanvasSoc"></canvas>
+                <div class="chart-tooltip" id="tooltipSoc" style="display: none;"></div>
+              </div>
+            </div>
+
+            <!-- Chart 3: Shared Bus Voltage (vbus, V) -->
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div class="chart-card-title">
+                  <span class="chart-metric-dot dot-violet"></span>
+                  <span>Shared Inter-Tie Bus Voltage (V_bus)</span>
+                </div>
+                <div class="chart-current-summary" id="chart3Summary">
+                  <span class="summary-n1">N1: 12.80 V</span>
+                  <span class="summary-n2">N2: 12.80 V</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container" id="canvasWrapVbus">
+                <canvas id="chartCanvasVbus"></canvas>
+                <div class="chart-tooltip" id="tooltipVbus" style="display: none;"></div>
+              </div>
+            </div>
+
+            <!-- Chart 4: Battery Net Current (ibat, A) -->
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div class="chart-card-title">
+                  <span class="chart-metric-dot dot-blue"></span>
+                  <span>Battery Net Current (I_bat)</span>
+                </div>
+                <div class="chart-current-summary" id="chart4Summary">
+                  <span class="summary-n1">N1: +0.32 A</span>
+                  <span class="summary-n2">N2: -0.24 A</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container" id="canvasWrapIbat">
+                <canvas id="chartCanvasIbat"></canvas>
+                <div class="chart-tooltip" id="tooltipIbat" style="display: none;"></div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Bottom Mobile Navigation Bar (Fixed on mobile with safe-area support) -->
+      <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+        <button class="mobile-nav-btn active" data-tab="live" id="mobileTabLive">
+          <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <span>Live</span>
+        </button>
+        <button class="mobile-nav-btn" data-tab="charts" id="mobileTabCharts">
+          <svg class="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <span>Charts</span>
+        </button>
+      </nav>
+
+      <!-- API & Test Configuration Modal -->
+      <div class="modal-backdrop" id="apiModalBackdrop" style="display: none;">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3 class="modal-title">Live Ingestion & Backend Config</h3>
+            <button class="modal-close-btn" id="modalCloseBtn" aria-label="Close dialog">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-desc">
+              Data is polled every <strong>2 seconds</strong> from the ingestion backend or Supabase. You can send test telemetry directly using <code>curl</code> or connect to Supabase.
+            </p>
+
+            <div class="form-group">
+              <label class="form-label" for="endpointInput">Ingest Read URL / Endpoint</label>
+              <input type="text" id="endpointInput" class="form-input" placeholder="/ingest or http://localhost:8787/ingest" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Quick Test Node 2 (curl command)</label>
+              <div class="code-snippet-box">
+                <pre id="curlSnippet">curl -X POST http://localhost:8787/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"node_id":2,"vbat":12.72,"ibat":0.35,"vpv":18.10,"ipv":0.52,"vbus":12.80,"ibus":-0.20,"soc":82,"pv_ok":true,"source":"PV","tie":"EXPORT","lockout":false}'</pre>
+                <button class="copy-btn" id="copyCurlBtn">Copy curl</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Simulate Ingest From Browser Now</label>
+              <div class="test-actions-row">
+                <button class="action-btn-secondary" id="sendTestN1Btn">Post Node 1 Event</button>
+                <button class="action-btn-primary" id="sendTestN2Btn">Post Node 2 Event</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Module Scripts -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

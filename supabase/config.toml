@@ -1,0 +1,24 @@
+# Supabase CLI configuration file
+# Documentation: https://supabase.com/docs/guides/cli/config
+
+project_id = "pv_research"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+# Edge Functions configuration
+# verify_jwt = false allows ESP32 devices to post telemetry using header `X-Device-Key`
+# without needing a Supabase JWT or bearer token.
+[functions.ingest]
+verify_jwt = false

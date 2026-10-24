@@ -1,0 +1,16 @@
+{
+  "name": "dual-nanogrid-monitor",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "mock": "node scripts/mock-backend.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vite": "^6.2.0"
+  }
+}

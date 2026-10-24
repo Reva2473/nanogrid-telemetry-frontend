@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E1622"/>
+      <stop offset="100%" stop-color="#080C12"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="tealGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2DD4BF"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <!-- Background rounded rect -->
+  <rect width="64" height="64" rx="16" fill="url(#bgGrad)" stroke="#1E293B" stroke-width="1.5"/>
+
+  <!-- Inter-tie bus line -->
+  <line x1="16" y1="32" x2="48" y2="32" stroke="#22D3EE" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+  <circle cx="32" cy="32" r="3.5" fill="#22D3EE" filter="url(#glow)"/>
+
+  <!-- Left Node: Solar PV -->
+  <g transform="translate(14, 18)">
+    <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#0B131E" stroke="#38BDF8" stroke-width="1.5"/>
+    <path d="M-5 -2 L5 -2 M-5 2 L5 2 M-2 -5 L-2 5 M2 -5 L2 5" stroke="#38BDF8" stroke-width="1" stroke-linecap="round"/>
+  </g>
+
+  <!-- Right Node: Battery -->
+  <g transform="translate(50, 18)">
+    <rect x="-8" y="-7" width="16" height="14" rx="3.5" fill="#0B131E" stroke="#10B981" stroke-width="1.5"/>
+    <rect x="8" y="-3" width="2" height="6" rx="1" fill="#10B981"/>
+    <path d="M-4 0 L4 0 M0 -4 L0 4" stroke="#10B981" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Connection drops -->
+  <path d="M14 26 L14 32 L50 32 L50 26" fill="none" stroke="url(#cyanGrad)" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Bottom shared status indicator -->
+  <rect x="22" y="44" width="20" height="7" rx="3.5" fill="#162232" stroke="#334155" stroke-width="1"/>
+  <circle cx="27" cy="47.5" r="1.8" fill="#10B981" filter="url(#glow)"/>
+  <circle cx="37" cy="47.5" r="1.8" fill="#22D3EE" filter="url(#glow)"/>
+</svg>
