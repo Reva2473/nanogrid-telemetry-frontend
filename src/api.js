@@ -144,8 +144,8 @@ class TelemetryService {
       }
     }
 
-    // 2. Try Ingest REST / Local proxy (/ingest or custom URL)
-    if (!liveSuccess) {
+    // 2. Try Ingest REST / Read endpoint (/functions/v1/ingest or custom URL)
+    if (!liveSuccess && this.ingestUrl) {
       try {
         liveSuccess = await this.fetchIngestEndpoint();
       } catch (err) {
@@ -153,16 +153,12 @@ class TelemetryService {
       }
     }
 
-    // If live backend had no data or was unreachable and we haven't received anything yet,
-    // we run a gentle background demo step so charts and views stay functional,
-    // but keep isDemoMode flag according to user preference.
     if (liveSuccess) {
       this.lastSuccessfulLiveFetch = Date.now();
-    } else {
-      // If user hasn't received live data, provide gentle demo stepping so UI is never blank
-      this.stepDemoSimulation();
     }
 
+    // In live mode, we only notify subscribers with real data.
+    // If no new telemetry arrived, timestamps naturally age so "Delayed" (10s) and "Offline" (30s) trigger properly.
     this.notify();
   }
 
@@ -228,27 +224,56 @@ class TelemetryService {
   }
 
   async fetchSupabase() {
-    const url = `${this.supabaseUrl.replace(/\/$/, '')}/rest/v1/telemetry?order=created_at.desc&limit=20`;
-    const res = await fetch(url, {
-      headers: {
-        'apikey': this.supabaseAnonKey,
-        'Authorization': `Bearer ${this.supabaseAnonKey}`,
-        'Accept': 'application/json'
-      }
-    });
+    const base = this.supabaseUrl.replace(/\/$/, '');
+    const headers = {
+      'apikey': this.supabaseAnonKey,
+      'Authorization': `Bearer ${this.supabaseAnonKey}`,
+      'Accept': 'application/json'
+    };
 
-    if (!res.ok) return false;
-    const records = await res.json();
-    if (!Array.isArray(records) || records.length === 0) return false;
+    const latestRes = await fetch(`${base}/rest/v1/node_latest?select=*`, { headers });
+    if (!latestRes.ok) return false;
+
+    const latestRecords = await latestRes.json();
+    if (!Array.isArray(latestRecords) || latestRecords.length === 0) return false;
 
     let updated = false;
-    for (const r of records) {
-      const nid = r.node_id === 2 || r.node === 2 ? 2 : 1;
-      // Only take the freshest record for each node
-      if (!this.nodes[nid] || new Date(r.created_at || r.timestamp) > new Date(this.nodes[nid].timestamp)) {
-        this.applyNodeData(nid, r);
-        updated = true;
+    for (const r of latestRecords) {
+      const nid = r.node === 2 ? 2 : 1;
+      this.applyNodeData(nid, r);
+      this.hasReceivedLive[nid] = true;
+      updated = true;
+    }
+
+    // Also fetch recent history for the charts
+    try {
+      const histRes = await fetch(`${base}/rest/v1/node_history?select=*&order=received_at.asc&limit=500`, { headers });
+      if (histRes.ok) {
+        const histRecords = await histRes.json();
+        if (Array.isArray(histRecords) && histRecords.length > 0) {
+          const h1 = [];
+          const h2 = [];
+          for (const h of histRecords) {
+            const nid = h.node === 2 ? 2 : 1;
+            const t = new Date(h.received_at).getTime();
+            const point = {
+              t,
+              vbat: Number(h.vbat),
+              soc: Number(h.soc),
+              vbus: Number(h.vbus),
+              ibat: Number(h.ibat),
+              vpv: Number(h.vpv),
+              ipv: Number(h.ipv)
+            };
+            if (nid === 2) h2.push(point);
+            else h1.push(point);
+          }
+          if (h1.length > 0) this.history[1] = h1;
+          if (h2.length > 0) this.history[2] = h2;
+        }
       }
+    } catch {
+      // Non-fatal if history fetch fails
     }
 
     return updated;
