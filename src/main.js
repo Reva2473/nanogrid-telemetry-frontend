@@ -304,10 +304,11 @@ function renderNodeCard(nodeId, data, historyList) {
   const soc = Math.max(0, Math.min(100, data.soc));
   if (socValue) socValue.textContent = `${Math.round(soc)}%`;
 
-  // Stroke Dasharray: 2 * PI * 40 ≈ 251.327
-  const circumference = 251.327;
+  // Stroke Dasharray: 2 * PI * 45 ≈ 282.743
+  const circumference = 282.743;
   const offset = circumference - (soc / 100) * circumference;
   if (socRing) {
+    socRing.style.strokeDasharray = circumference.toString();
     socRing.style.strokeDashoffset = offset.toString();
     // Color thresholds: > 40% green, 20-40% amber, < 20% red
     if (soc > 40) {

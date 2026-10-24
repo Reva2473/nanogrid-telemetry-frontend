@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#0B0F14" />
+    <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="Dual Nanogrid Monitor — Real-time telemetry for solar PV, battery storage, and inter-tie DC bus power transfer between Node 1 and Node 2." />
@@ -21,7 +21,7 @@
     <style>
       /* Immediate dark background to prevent any white flash during initial paint */
       html, body {
-        background-color: #0B0F14;
+        background-color: #000000;
         color: #F1F5F9;
         margin: 0;
         padding: 0;
@@ -259,8 +259,8 @@
                     <!-- Circular SVG SOC Gauge -->
                     <div class="soc-gauge-wrapper">
                       <svg class="soc-gauge-svg" viewBox="0 0 100 100">
-                        <circle class="gauge-bg-ring" cx="50" cy="50" r="40" />
-                        <circle class="gauge-progress-ring" id="node1SocRing" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="50" />
+                        <circle class="gauge-bg-ring" cx="50" cy="50" r="45" />
+                        <circle class="gauge-progress-ring" id="node1SocRing" cx="50" cy="50" r="45" stroke-dasharray="282.74" stroke-dashoffset="50.89" />
                       </svg>
                       <div class="soc-gauge-inner">
                         <span class="soc-number" id="node1SocValue">82%</span>
@@ -526,8 +526,8 @@
                     <!-- Circular SVG SOC Gauge -->
                     <div class="soc-gauge-wrapper">
                       <svg class="soc-gauge-svg" viewBox="0 0 100 100">
-                        <circle class="gauge-bg-ring" cx="50" cy="50" r="40" />
-                        <circle class="gauge-progress-ring" id="node2SocRing" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="100" />
+                        <circle class="gauge-bg-ring" cx="50" cy="50" r="45" />
+                        <circle class="gauge-progress-ring" id="node2SocRing" cx="50" cy="50" r="45" stroke-dasharray="282.74" stroke-dashoffset="98.96" />
                       </svg>
                       <div class="soc-gauge-inner">
                         <span class="soc-number" id="node2SocValue">65%</span>

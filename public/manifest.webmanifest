@@ -4,8 +4,8 @@
   "description": "Real-time mobile-first dual nanogrid telemetry monitor for solar PV, battery storage, and shared inter-tie DC bus.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0B0F14",
-  "theme_color": "#0B0F14",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "/favicon.svg",

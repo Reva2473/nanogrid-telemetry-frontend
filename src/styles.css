@@ -4,12 +4,12 @@
    ========================================================================== */
 
 :root {
-  /* Color Palette */
-  --bg-dark: #0B0F14;
-  --bg-card: #121820;
-  --bg-card-subtle: #161F2A;
-  --border-card: #1E2733;
-  --border-card-subtle: #243040;
+  /* Color Palette — Pure Black Background */
+  --bg-dark: #000000;
+  --bg-card: #090C10;
+  --bg-card-subtle: #0D1218;
+  --border-card: #1A222D;
+  --border-card-subtle: #1E2936;
   
   /* Primary Accents */
   --accent-cyan: #22D3EE;
@@ -101,7 +101,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(11, 15, 20, 0.88);
+  background: rgba(0, 0, 0, 0.92);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-card);
@@ -441,7 +441,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: #0E141B;
+  background: #040609;
   border: 1px solid var(--border-card-subtle);
   border-radius: var(--radius-tile);
   padding: 10px 14px;
@@ -743,7 +743,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: #0E141B;
+  background: #040609;
   border: 1px solid var(--border-card-subtle);
   padding: 6px 8px;
   border-radius: var(--radius-pill);
@@ -784,10 +784,10 @@ body {
 }
 
 .telemetry-block {
-  background: #0E141B;
+  background: #040609;
   border: 1px solid var(--border-card-subtle);
   border-radius: var(--radius-tile);
-  padding: 14px;
+  padding: 16px;
   position: relative;
   overflow: hidden;
 }
@@ -796,18 +796,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: nowrap;
 }
 
 .block-title-wrap {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  min-width: 0;
 }
 
 .block-svg-icon {
   width: 15px;
   height: 15px;
+  flex-shrink: 0;
 }
 
 .block-title {
@@ -816,15 +820,20 @@ body {
   letter-spacing: 0.04em;
   color: #CBD5E1;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .block-state-badge {
   font-size: 0.68rem;
   font-weight: 700;
-  padding: 2px 7px;
+  padding: 3px 9px;
   border-radius: var(--radius-pill);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .badge-green {
@@ -867,13 +876,13 @@ body {
 .battery-content-split {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
 .soc-gauge-wrapper {
   position: relative;
-  width: 82px;
-  height: 82px;
+  width: 120px;
+  height: 120px;
   flex-shrink: 0;
 }
 
@@ -885,14 +894,14 @@ body {
 
 .gauge-bg-ring {
   fill: none;
-  stroke: #1E2733;
-  stroke-width: 8;
+  stroke: #1A222D;
+  stroke-width: 6.2;
 }
 
 .gauge-progress-ring {
   fill: none;
   stroke: var(--status-green);
-  stroke-width: 8;
+  stroke-width: 6.2;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
 }
@@ -907,21 +916,25 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 14px;
+  text-align: center;
 }
 
 .soc-number {
-  font-size: 1.15rem;
+  font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #FFFFFF;
+  line-height: 1.1;
 }
 
 .soc-label {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-top: -2px;
+  margin-top: 2px;
+  white-space: nowrap;
 }
 
 /* Metric Rows */
@@ -978,7 +991,7 @@ body {
    Per-Node Energy Flow Diagram (SVG)
    ========================================================================== */
 .flow-diagram-container {
-  background: #0E141B;
+  background: #040609;
   border: 1px solid var(--border-card-subtle);
   border-radius: var(--radius-tile);
   padding: 12px;
@@ -1473,11 +1486,7 @@ body {
 
 @media (min-width: 1100px) {
   .node-blocks-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .node-blocks-grid > .telemetry-block:first-child {
-    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
   }
 
   .block-sparkline-wrap {
