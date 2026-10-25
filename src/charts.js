@@ -85,16 +85,38 @@ export class TelemetryChart {
     this.render();
   }
 
+  getWindowMs() {
+    if (this.timeRange === '1h') return 60 * 60 * 1000;
+    if (this.timeRange === '24h') return 24 * 60 * 60 * 1000;
+    return 15 * 60 * 1000;
+  }
+
   filterByRange(series) {
     if (!series || !series.length) return [];
     const now = Date.now();
-    let windowMs = 15 * 60 * 1000;
-    if (this.timeRange === '1h') windowMs = 60 * 60 * 1000;
-    else if (this.timeRange === '24h') windowMs = 24 * 60 * 60 * 1000;
-
+    const windowMs = this.getWindowMs();
     const cutoff = now - windowMs;
-    const filtered = series.filter(pt => pt.t >= cutoff);
-    return filtered.length > 0 ? filtered : series.slice(-30);
+
+    // Find first index >= cutoff
+    let firstIdx = series.findIndex(pt => pt.t >= cutoff);
+    if (firstIdx === -1) {
+      return [];
+    }
+
+    const filtered = series.slice(firstIdx);
+
+    // If there is a point immediately preceding the cutoff, interpolate/anchor at cutoff
+    // so the line starts cleanly at the left edge when prior history exists
+    if (firstIdx > 0) {
+      const prev = series[firstIdx - 1];
+      const curr = series[firstIdx];
+      const dt = curr.t - prev.t;
+      const ratio = dt > 0 ? (cutoff - prev.t) / dt : 0;
+      const interpVal = prev.val + (curr.val - prev.val) * Math.max(0, Math.min(1, ratio));
+      filtered.unshift({ t: cutoff, val: interpVal });
+    }
+
+    return filtered;
   }
 
   render() {
@@ -164,16 +186,14 @@ export class TelemetryChart {
       ctx.fillText(`${val.toFixed(this.formatDecimals)}`, padding.left - 6, y);
     }
 
-    // X Time axis reference
-    const minTime = Math.min(
-      s1.length ? s1[0].t : Infinity,
-      s2.length ? s2[0].t : Infinity
-    );
+    // X Time axis reference: always span the full selected window (15m, 1h, or 24h) ending at now
     const maxTime = Math.max(
+      Date.now(),
       s1.length ? s1[s1.length - 1].t : -Infinity,
       s2.length ? s2[s2.length - 1].t : -Infinity
     );
-    const timeSpan = Math.max(1000, maxTime - minTime);
+    const timeSpan = this.getWindowMs();
+    const minTime = maxTime - timeSpan;
 
     // Format X labels
     ctx.textAlign = 'center';
@@ -307,10 +327,10 @@ export class TelemetryChart {
       const p2 = pts[i + 1];
       const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
 
-      // Catmull-Rom to Cubic Bezier conversion
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      // Catmull-Rom to Monotone-X Cubic Bezier conversion (prevents time-axis loopback)
+      const cp1x = Math.min(p2.x, Math.max(p1.x, p1.x + (p2.x - p0.x) / 6));
       const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2x = Math.max(p1.x, Math.min(p2.x, p2.x - (p3.x - p1.x) / 6));
       const cp2y = p2.y - (p3.y - p1.y) / 6;
 
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
@@ -327,15 +347,13 @@ export class TelemetryChart {
     const s1 = this.filterByRange(this.dataNode1);
     const s2 = this.filterByRange(this.dataNode2);
 
-    const minTime = Math.min(
-      s1.length ? s1[0].t : Infinity,
-      s2.length ? s2[0].t : Infinity
-    );
     const maxTime = Math.max(
+      Date.now(),
       s1.length ? s1[s1.length - 1].t : -Infinity,
       s2.length ? s2[s2.length - 1].t : -Infinity
     );
-    const timeSpan = Math.max(1000, maxTime - minTime);
+    const timeSpan = this.getWindowMs();
+    const minTime = maxTime - timeSpan;
 
     const targetTime = minTime + ((x - padding.left) / chartW) * timeSpan;
     const c1 = this.findClosest(s1, targetTime);

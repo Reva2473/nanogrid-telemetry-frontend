@@ -69,8 +69,10 @@ class TelemetryService {
       2: []
     };
 
-    // Pre-populate with realistic 24-hour baseline history
-    this.seedHistoricalData();
+    // Pre-populate baseline history only when in Demo Simulation mode
+    if (this.isDemoMode) {
+      this.seedHistoricalData();
+    }
   }
 
   setIngestUrl(url) {
@@ -81,6 +83,13 @@ class TelemetryService {
   setDemoMode(enabled) {
     this.isDemoMode = enabled;
     localStorage.setItem('nanogrid_mode', enabled ? 'demo' : 'live');
+    if (enabled && this.history[1].length === 0) {
+      this.seedHistoricalData();
+    } else if (!enabled) {
+      this.history = { 1: [], 2: [] };
+      this.historyLoadedFromDb = false;
+      this.poll();
+    }
     this.notify();
   }
 
@@ -238,46 +247,50 @@ class TelemetryService {
     const latestRecords = await latestRes.json();
     if (!Array.isArray(latestRecords) || latestRecords.length === 0) return false;
 
+    // Fetch initial historical baseline once on boot BEFORE applying latest live packet
+    if (!this.historyLoadedFromDb) {
+      try {
+        const histRes = await fetch(`${base}/rest/v1/node_history?select=*&order=received_at.desc&limit=2000`, { headers });
+        if (histRes.ok) {
+          const histRecords = await histRes.json();
+          this.historyLoadedFromDb = true;
+          const h1 = [];
+          const h2 = [];
+          if (Array.isArray(histRecords) && histRecords.length > 0) {
+            for (const h of histRecords) {
+              const nid = h.node === 2 ? 2 : 1;
+              const t = new Date(h.received_at).getTime();
+              if (!isNaN(t)) {
+                const point = {
+                  t,
+                  vbat: Number(h.vbat),
+                  soc: Number(h.soc),
+                  vbus: Number(h.vbus),
+                  ibat: Number(h.ibat),
+                  vpv: Number(h.vpv),
+                  ipv: Number(h.ipv)
+                };
+                if (nid === 2) h2.push(point);
+                else h1.push(point);
+              }
+            }
+            h1.sort((a, b) => a.t - b.t);
+            h2.sort((a, b) => a.t - b.t);
+          }
+          this.history[1] = h1;
+          this.history[2] = h2;
+        }
+      } catch {
+        // Non-fatal if history fetch fails
+      }
+    }
+
     let updated = false;
     for (const r of latestRecords) {
       const nid = r.node === 2 ? 2 : 1;
       this.applyNodeData(nid, r);
       this.hasReceivedLive[nid] = true;
       updated = true;
-    }
-
-    // Fetch initial historical baseline once on boot, then let live 1s points append seamlessly
-    if (!this.historyLoadedFromDb) {
-      try {
-        const histRes = await fetch(`${base}/rest/v1/node_history?select=*&order=received_at.asc&limit=500`, { headers });
-        if (histRes.ok) {
-          const histRecords = await histRes.json();
-          this.historyLoadedFromDb = true;
-          if (Array.isArray(histRecords) && histRecords.length > 0) {
-            const h1 = [];
-            const h2 = [];
-            for (const h of histRecords) {
-              const nid = h.node === 2 ? 2 : 1;
-              const t = new Date(h.received_at).getTime();
-              const point = {
-                t,
-                vbat: Number(h.vbat),
-                soc: Number(h.soc),
-                vbus: Number(h.vbus),
-                ibat: Number(h.ibat),
-                vpv: Number(h.vpv),
-                ipv: Number(h.ipv)
-              };
-              if (nid === 2) h2.push(point);
-              else h1.push(point);
-            }
-            if (h1.length > 0) this.history[1] = h1;
-            if (h2.length > 0) this.history[2] = h2;
-          }
-        }
-      } catch {
-        // Non-fatal if history fetch fails
-      }
     }
 
     return updated;
@@ -369,10 +382,12 @@ class TelemetryService {
   }
 
   appendHistoryPoint(nodeId, item) {
-    const t = item.local_received_at || Date.now();
+    // Use server timestamp (consistent with node_history) or fallback to local_received_at
+    const parsedServerT = item.timestamp ? new Date(item.timestamp).getTime() : NaN;
+    const t = !isNaN(parsedServerT) ? parsedServerT : (item.local_received_at || Date.now());
     const arr = this.history[nodeId];
-    if (arr.length > 0 && arr[arr.length - 1].t === t) {
-      return; // Avoid duplicate entry when polling sees the same timestamp
+    if (arr.length > 0 && arr[arr.length - 1].t >= t) {
+      return; // Avoid duplicate or out-of-order timestamp
     }
     arr.push({
       t,
