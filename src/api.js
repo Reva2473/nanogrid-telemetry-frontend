@@ -83,14 +83,21 @@ class TelemetryService {
   setDemoMode(enabled) {
     this.isDemoMode = enabled;
     localStorage.setItem('nanogrid_mode', enabled ? 'demo' : 'live');
-    if (enabled && this.history[1].length === 0) {
+
+    // Completely wipe existing chart & sparkline history on every mode switch
+    // so Demo data and Live data are never displayed together on the same graph
+    this.history = { 1: [], 2: [] };
+
+    if (enabled) {
       this.seedHistoricalData();
-    } else if (!enabled) {
-      this.history = { 1: [], 2: [] };
+      this.stepDemoSimulation();
+      this.notify();
+    } else {
       this.historyLoadedFromDb = false;
+      this.hasReceivedLive = { 1: false, 2: false };
+      this.notify();
       this.poll();
     }
-    this.notify();
   }
 
   subscribe(callback) {
@@ -178,9 +185,9 @@ class TelemetryService {
       headers: { 'Accept': 'application/json' }
     });
 
-    if (!res.ok) return false;
+    if (this.isDemoMode || !res.ok) return false;
     const data = await res.json();
-    if (!data) return false;
+    if (this.isDemoMode || !data) return false;
 
     let updated = false;
 
@@ -242,17 +249,19 @@ class TelemetryService {
     };
 
     const latestRes = await fetch(`${base}/rest/v1/node_latest?select=*`, { headers });
-    if (!latestRes.ok) return false;
+    if (this.isDemoMode || !latestRes.ok) return false;
 
     const latestRecords = await latestRes.json();
-    if (!Array.isArray(latestRecords) || latestRecords.length === 0) return false;
+    if (this.isDemoMode || !Array.isArray(latestRecords) || latestRecords.length === 0) return false;
 
     // Fetch initial historical baseline once on boot BEFORE applying latest live packet
     if (!this.historyLoadedFromDb) {
       try {
         const histRes = await fetch(`${base}/rest/v1/node_history?select=*&order=received_at.desc&limit=2000`, { headers });
+        if (this.isDemoMode) return false;
         if (histRes.ok) {
           const histRecords = await histRes.json();
+          if (this.isDemoMode) return false;
           this.historyLoadedFromDb = true;
           const h1 = [];
           const h2 = [];
@@ -520,25 +529,38 @@ class TelemetryService {
   }
 
   seedHistoricalData() {
+    this.history = { 1: [], 2: [] };
     const now = Date.now();
-    const points = 72; // 24-hour simulation at 20-minute intervals
-    const intervalMs = (24 * 60 * 60 * 1000) / points;
+    const dayMs = 24 * 60 * 60 * 1000;
 
-    for (let i = points; i >= 0; i--) {
-      const t = now - (i * intervalMs);
-      const angle = (t / (24 * 60 * 60 * 1000)) * Math.PI * 2;
+    // Build timestamps covering 24h:
+    // - 24h ago to 1h ago: every 15 minutes
+    // - 1h ago to 15m ago: every 1 minute
+    // - 15m ago to now: every 15 seconds
+    const timestamps = [];
+    for (let offset = dayMs; offset > 60 * 60 * 1000; offset -= 15 * 60 * 1000) {
+      timestamps.push(now - offset);
+    }
+    for (let offset = 60 * 60 * 1000; offset > 15 * 60 * 1000; offset -= 60 * 1000) {
+      timestamps.push(now - offset);
+    }
+    for (let offset = 15 * 60 * 1000; offset >= 0; offset -= 15 * 1000) {
+      timestamps.push(now - offset);
+    }
 
-      // Diurnal solar wave
+    for (const t of timestamps) {
+      const tsSec = t / 1000;
+      const angle = (t / dayMs) * Math.PI * 2;
       const solarStrength = Math.max(0, Math.sin(angle));
 
-      // Node 1 History
-      const n1Vpv = solarStrength > 0.1 ? 17.5 + solarStrength * 0.8 : 3.5;
-      const n1Ipv = solarStrength > 0.1 ? solarStrength * 0.55 : 0;
-      const n1Vbat = 12.3 + solarStrength * 0.45;
-      const n1Ibat = solarStrength > 0.2 ? 0.35 : -0.12;
-      const n1Soc = 75 + solarStrength * 18;
-      const n1Vbus = 12.80 + Math.sin(angle * 3) * 0.03;
-      const n1Ibus = solarStrength > 0.3 ? -0.16 : 0.02;
+      // Node 1 Demo History (smoothly matches stepDemoSimulation waveform)
+      const n1Vpv = 17.6 + Math.sin(tsSec * 0.05) * 0.35;
+      const n1Ipv = Math.max(0.05, Math.sin(tsSec * 0.08) * 0.08 + 0.45);
+      const n1Vbat = 12.60 + Math.sin(tsSec * 0.03) * 0.08;
+      const n1Ibat = 0.28 + Math.sin(tsSec * 0.06) * 0.06;
+      const n1Soc = 82.0 + Math.sin(tsSec * 0.02) * 1.5;
+      const n1Vbus = 12.80 + Math.sin(tsSec * 0.04) * 0.02;
+      const n1Ibus = -0.15 + Math.sin(tsSec * 0.07) * 0.03;
 
       this.history[1].push({
         t,
@@ -550,14 +572,16 @@ class TelemetryService {
         ipv: Number(n1Ipv.toFixed(3))
       });
 
-      // Node 2 History
-      const n2Vpv = 4.0;
+      // Node 2 Demo History (smoothly matches stepDemoSimulation waveform)
+      const n2Vpv = 4.10 + Math.sin(tsSec * 0.02) * 0.15;
       const n2Ipv = 0.0;
-      const n2Vbat = 12.5 - Math.min(0.35, (1 - solarStrength) * 0.25);
-      const n2Ibat = solarStrength > 0.3 ? 0.12 : -0.22;
-      const n2Soc = 72 - (1 - solarStrength) * 14;
+      const n2Vbat = 12.38 + Math.sin(tsSec * 0.03 + 2.0) * 0.06;
+      const n2Ibat = -0.22 + Math.sin(tsSec * 0.05 + 1.0) * 0.04;
+      const n2Soc = 65.0 - Math.sin(tsSec * 0.02) * 1.2;
       const n2Vbus = n1Vbus;
       const n2Ibus = -n1Ibus;
+      void solarStrength;
+      void n2Ibus;
 
       this.history[2].push({
         t,
