@@ -274,14 +274,14 @@ Deno.serve(async (req: Request) => {
       const nowIso = new Date(nowMs).toISOString();
       const supabase = getSupabaseAdmin();
 
-      // 4. Rate Limiting Check (< 1500ms per node)
-      const RATE_LIMIT_MS = 1500;
+      // 4. Rate Limiting Check (< 400ms per node to allow 1-second ESP32 cadence with Wi-Fi jitter)
+      const RATE_LIMIT_MS = 400;
 
       // Check in-memory isolate timestamp
       const lastMemoryPost = lastPostByNode.get(payload.node);
       if (lastMemoryPost && nowMs - lastMemoryPost < RATE_LIMIT_MS) {
         return jsonResponse({
-          error: "Rate limit exceeded: Telemetry frequency must not exceed 1 packet per 1.5 seconds per node",
+          error: "Rate limit exceeded: Telemetry frequency must not exceed 1 packet per 400ms per node",
           node: payload.node,
         }, 429);
       }
@@ -297,7 +297,7 @@ Deno.serve(async (req: Request) => {
         const lastDbMs = new Date(latestExisting.received_at).getTime();
         if (nowMs - lastDbMs < RATE_LIMIT_MS) {
           return jsonResponse({
-            error: "Rate limit exceeded: Telemetry frequency must not exceed 1 packet per 1.5 seconds per node",
+            error: "Rate limit exceeded: Telemetry frequency must not exceed 1 packet per 400ms per node",
             node: payload.node,
           }, 429);
         }
@@ -332,7 +332,7 @@ Deno.serve(async (req: Request) => {
       let historySampled = false;
       const shouldSampleHistory =
         !latestHistory ||
-        nowMs - new Date(latestHistory.received_at).getTime() >= 30_000;
+        nowMs - new Date(latestHistory.received_at).getTime() >= 5_000;
 
       if (shouldSampleHistory) {
         const { error: histInsertErr } = await supabase

@@ -27,7 +27,7 @@ static const char* WIFI_PASS  = "YOUR_WIFI_PASSWORD";
 static const char* INGEST_URL = "https://bifxzalcuyoimaxapcqx.supabase.co/functions/v1/ingest";
 static const char* DEVICE_KEY = "YOUR_SECRET_DEVICE_KEY";
 
-static const unsigned long TELEMETRY_INTERVAL_MS = 3000UL;
+static const unsigned long TELEMETRY_INTERVAL_MS = 1000UL;
 static const unsigned long WIFI_RETRY_INTERVAL_MS = 10000UL;
 
 // =============================================================================
@@ -70,11 +70,21 @@ inline void _telemetryWorkerTask(void* parameter) {
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   lastWifiAttemptMs = millis();
 
+  WiFiClientSecure client;
+  client.setInsecure(); // Skip root CA bundle overhead on ESP32
+  HTTPClient http;
+  http.setReuse(true);  // Keep TLS socket alive for fast 1-second updates
+  bool httpConnected = false;
+
   for (;;) {
     unsigned long now = millis();
 
     // Non-blocking WiFi reconnect check every 10s
     if (WiFi.status() != WL_CONNECTED) {
+      if (httpConnected) {
+        http.end();
+        httpConnected = false;
+      }
       if (now - lastWifiAttemptMs >= WIFI_RETRY_INTERVAL_MS) {
         lastWifiAttemptMs = now;
         WiFi.disconnect();
@@ -84,7 +94,7 @@ inline void _telemetryWorkerTask(void* parameter) {
       continue;
     }
 
-    // Post every 3 seconds when connected and data is ready
+    // Post every 1 second when connected and data is ready
     if (_latestTelemetry.hasData && (now - lastPostMs >= TELEMETRY_INTERVAL_MS)) {
       lastPostMs = now;
 
@@ -137,22 +147,23 @@ inline void _telemetryWorkerTask(void* parameter) {
       );
 
       if (len > 0 && len < (int)sizeof(jsonBuffer)) {
-        WiFiClientSecure client;
-        client.setInsecure(); // Skip root CA bundle overhead on ESP32
-        HTTPClient http;
-        http.setTimeout(3500);
-
-        if (http.begin(client, INGEST_URL)) {
+        if (!httpConnected) {
+          http.setTimeout(2500);
+          httpConnected = http.begin(client, INGEST_URL);
+        }
+        if (httpConnected) {
           http.addHeader("Content-Type", "application/json");
           http.addHeader("X-Device-Key", DEVICE_KEY);
           int code = http.POST((uint8_t*)jsonBuffer, strlen(jsonBuffer));
-          http.end();
-          (void)code;
+          if (code <= 0) {
+            http.end();
+            httpConnected = false;
+          }
         }
       }
     }
 
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
 

@@ -6,8 +6,9 @@
 class TelemetryService {
   constructor() {
     this.subscribers = new Set();
-    this.pollIntervalMs = 2000;
+    this.pollIntervalMs = 1000;
     this.pollTimer = null;
+    this.historyLoadedFromDb = false;
 
     // Configuration endpoints
     const savedUrl = localStorage.getItem('nanogrid_ingest_url');
@@ -245,35 +246,38 @@ class TelemetryService {
       updated = true;
     }
 
-    // Also fetch recent history for the charts
-    try {
-      const histRes = await fetch(`${base}/rest/v1/node_history?select=*&order=received_at.asc&limit=500`, { headers });
-      if (histRes.ok) {
-        const histRecords = await histRes.json();
-        if (Array.isArray(histRecords) && histRecords.length > 0) {
-          const h1 = [];
-          const h2 = [];
-          for (const h of histRecords) {
-            const nid = h.node === 2 ? 2 : 1;
-            const t = new Date(h.received_at).getTime();
-            const point = {
-              t,
-              vbat: Number(h.vbat),
-              soc: Number(h.soc),
-              vbus: Number(h.vbus),
-              ibat: Number(h.ibat),
-              vpv: Number(h.vpv),
-              ipv: Number(h.ipv)
-            };
-            if (nid === 2) h2.push(point);
-            else h1.push(point);
+    // Fetch initial historical baseline once on boot, then let live 1s points append seamlessly
+    if (!this.historyLoadedFromDb) {
+      try {
+        const histRes = await fetch(`${base}/rest/v1/node_history?select=*&order=received_at.asc&limit=500`, { headers });
+        if (histRes.ok) {
+          const histRecords = await histRes.json();
+          this.historyLoadedFromDb = true;
+          if (Array.isArray(histRecords) && histRecords.length > 0) {
+            const h1 = [];
+            const h2 = [];
+            for (const h of histRecords) {
+              const nid = h.node === 2 ? 2 : 1;
+              const t = new Date(h.received_at).getTime();
+              const point = {
+                t,
+                vbat: Number(h.vbat),
+                soc: Number(h.soc),
+                vbus: Number(h.vbus),
+                ibat: Number(h.ibat),
+                vpv: Number(h.vpv),
+                ipv: Number(h.ipv)
+              };
+              if (nid === 2) h2.push(point);
+              else h1.push(point);
+            }
+            if (h1.length > 0) this.history[1] = h1;
+            if (h2.length > 0) this.history[2] = h2;
           }
-          if (h1.length > 0) this.history[1] = h1;
-          if (h2.length > 0) this.history[2] = h2;
         }
+      } catch {
+        // Non-fatal if history fetch fails
       }
-    } catch {
-      // Non-fatal if history fetch fails
     }
 
     return updated;
@@ -350,7 +354,11 @@ class TelemetryService {
 
   appendHistoryPoint(nodeId, item) {
     const t = item.local_received_at || Date.now();
-    this.history[nodeId].push({
+    const arr = this.history[nodeId];
+    if (arr.length > 0 && arr[arr.length - 1].t === t) {
+      return; // Avoid duplicate entry when polling sees the same timestamp
+    }
+    arr.push({
       t,
       vbat: item.vbat,
       soc: item.soc,
@@ -361,8 +369,8 @@ class TelemetryService {
     });
 
     // Retain up to 2000 points
-    if (this.history[nodeId].length > 2000) {
-      this.history[nodeId].shift();
+    if (arr.length > 2000) {
+      arr.shift();
     }
   }
 
