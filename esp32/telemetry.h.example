@@ -73,18 +73,13 @@ inline void _telemetryWorkerTask(void* parameter) {
   WiFiClientSecure client;
   client.setInsecure(); // Skip root CA bundle overhead on ESP32
   HTTPClient http;
-  http.setReuse(true);  // Keep TLS socket alive for fast 1-second updates
-  bool httpConnected = false;
+  http.setReuse(true);  // Keep underlying TLS socket open across http.begin()/http.end()
 
   for (;;) {
     unsigned long now = millis();
 
     // Non-blocking WiFi reconnect check every 10s
     if (WiFi.status() != WL_CONNECTED) {
-      if (httpConnected) {
-        http.end();
-        httpConnected = false;
-      }
       if (now - lastWifiAttemptMs >= WIFI_RETRY_INTERVAL_MS) {
         lastWifiAttemptMs = now;
         WiFi.disconnect();
@@ -147,18 +142,13 @@ inline void _telemetryWorkerTask(void* parameter) {
       );
 
       if (len > 0 && len < (int)sizeof(jsonBuffer)) {
-        if (!httpConnected) {
-          http.setTimeout(2500);
-          httpConnected = http.begin(client, INGEST_URL);
-        }
-        if (httpConnected) {
+        http.setTimeout(2500);
+        if (http.begin(client, INGEST_URL)) {
           http.addHeader("Content-Type", "application/json");
           http.addHeader("X-Device-Key", DEVICE_KEY);
           int code = http.POST((uint8_t*)jsonBuffer, strlen(jsonBuffer));
-          if (code <= 0) {
-            http.end();
-            httpConnected = false;
-          }
+          http.end(); // Clears headers while keeping TLS socket open when setReuse(true)
+          (void)code;
         }
       }
     }
@@ -176,7 +166,7 @@ inline void telemetryInit() {
   xTaskCreatePinnedToCore(
     _telemetryWorkerTask,
     "NanogridTelemetry",
-    8192,
+    16384, // 16KB stack for mbedTLS + HTTPClient headroom
     NULL,
     1,
     NULL,
