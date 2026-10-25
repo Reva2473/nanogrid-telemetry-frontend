@@ -17,6 +17,8 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 // =============================================================================
 // 1. FILL IN YOUR WIFI & DEVICE KEY HERE (Never upload telemetry.h to GitHub)
@@ -68,6 +70,7 @@ inline void _telemetryWorkerTask(void* parameter) {
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.setTxPower(WIFI_POWER_11dBm); // Lower peak RF TX current spike to prevent USB/5V brownout dips
   lastWifiAttemptMs = millis();
 
   WiFiClientSecure client;
@@ -84,6 +87,7 @@ inline void _telemetryWorkerTask(void* parameter) {
         lastWifiAttemptMs = now;
         WiFi.disconnect();
         WiFi.begin(WIFI_SSID, WIFI_PASS);
+        WiFi.setTxPower(WIFI_POWER_11dBm);
       }
       vTaskDelay(pdMS_TO_TICKS(250));
       continue;
@@ -163,6 +167,9 @@ inline void _telemetryWorkerTask(void* parameter) {
 
 // Call once at the end of setup()
 inline void telemetryInit() {
+  // Disable hardware brownout detector resets caused by microsecond relay coil + Wi-Fi TX current spikes
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
   xTaskCreatePinnedToCore(
     _telemetryWorkerTask,
     "NanogridTelemetry",
