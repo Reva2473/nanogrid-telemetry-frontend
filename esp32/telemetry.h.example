@@ -1,28 +1,12 @@
 /**
  * =============================================================================
- * NANOGRID DUAL-NODE TELEMETRY CLIENT (ESP32)
- * File: esp32/telemetry.h.example
+ * NANOGRID DUAL-NODE TELEMETRY CLIENT (ESP32) — NON-BLOCKING FREERTOS EDITION
+ * File: telemetry.h (save in the same folder as your Arduino .ino sketch)
  * =============================================================================
- * 
- * INSTRUCTIONS:
- * 1. Copy this template to `esp32/telemetry.h`:
- *      cp esp32/telemetry.h.example esp32/telemetry.h
- * 2. Update `INGEST_URL` and `DEVICE_KEY` below with your credentials.
- * 3. `esp32/telemetry.h` is excluded from git tracking via .gitignore to prevent
- *    accidental secret leakage.
- * 
- * =============================================================================
- * 4-LINE INTEGRATION EXAMPLE IN YOUR MAIN .ino SKETCH:
- * =============================================================================
- * 
- *   #include "telemetry.h"                           // Line 1: Include this header
- * 
- *   void loop() {
- *     // ... your state machine / ADC sampling code ...
- *     NanogridTelemetry data = readCurrentState();     // Line 2: Gather telemetry
- *     data.uptime_s = millis() / 1000UL;              // Line 3: Stamp uptime
- *     sendTelemetry(data);                            // Line 4: Transmit (paced at 3s)
- *   }
+ *
+ * Zero impact on your 100ms control loop:
+ * - WiFi connection & HTTPS POST run in a background FreeRTOS task on Core 0.
+ * - Your main loop() on Core 1 never blocks, even if WiFi is disconnected or slow.
  * =============================================================================
  */
 
@@ -35,64 +19,85 @@
 #include <WiFiClientSecure.h>
 
 // =============================================================================
-// CONFIGURATION (Set your environment credentials here)
+// 1. FILL IN YOUR WIFI & DEVICE KEY HERE (Never upload telemetry.h to GitHub)
 // =============================================================================
+static const char* WIFI_SSID  = "YOUR_WIFI_SSID";
+static const char* WIFI_PASS  = "YOUR_WIFI_PASSWORD";
 
-// Target Ingest URL:
-// For Supabase Edge Function:
-//   "https://<your-project-ref>.supabase.co/functions/v1/ingest"
-// For Local Mock Backend on same Wi-Fi subnet:
-//   "http://192.168.1.100:8787/ingest"
-static const char* INGEST_URL = "https://your-project-id.supabase.co/functions/v1/ingest";
+static const char* INGEST_URL = "https://bifxzalcuyoimaxapcqx.supabase.co/functions/v1/ingest";
+static const char* DEVICE_KEY = "YOUR_SECRET_DEVICE_KEY";
 
-// Device Key matching DEVICE_KEY configured in Supabase Edge Secrets
-static const char* DEVICE_KEY = "replace-with-your-secret-device-key";
-
-// Telemetry interval in milliseconds (default: 3 seconds)
 static const unsigned long TELEMETRY_INTERVAL_MS = 3000UL;
+static const unsigned long WIFI_RETRY_INTERVAL_MS = 10000UL;
 
 // =============================================================================
-// TELEMETRY DATA STRUCTURE (Strict 16 fields)
+// 2. TELEMETRY DATA STRUCTURE (16 fields)
 // =============================================================================
 struct NanogridTelemetry {
-    uint8_t     node;           // 1 or 2
-    uint32_t    uptime_s;       // Uptime in seconds
-    const char* src;            // "NONE", "PV", or "BATTERY"
-    const char* tie;            // "NONE", "EXPORT", or "IMPORT"
-    float       soc;            // Battery state of charge (0.0 to 100.0 %)
-    float       vbat;           // Battery voltage (V)
-    float       ibat;           // Battery current (A, positive = discharge)
-    float       vpv;            // Solar PV voltage (V)
-    float       ipv;            // Solar PV current (A)
-    float       vbus;           // DC Bus voltage (V)
-    float       ibus;           // DC Bus tie current (A)
-    bool        pv_ok;          // Solar PV available flag
-    bool        lockout;        // Safety lockout active flag
-    bool        import_bus_ok;  // Import tie bus healthy flag
-    int16_t     rssi;           // WiFi RSSI (dBm, e.g. -68)
-    const char* fw;             // Firmware version string (e.g. "v1.2.0-n1")
+  uint8_t  node;
+  uint32_t uptime_s;
+  char     src[12];
+  char     tie[12];
+  float    soc;
+  float    vbat;
+  float    ibat;
+  float    vpv;
+  float    ipv;
+  float    vbus;
+  float    ibus;
+  bool     pv_ok;
+  bool     lockout;
+  bool     import_bus_ok;
+  int16_t  rssi;
+  char     fw[24];
+  bool     hasData;
+};
+
+static volatile bool _telemetryLock = false;
+static NanogridTelemetry _latestTelemetry = {
+  1, 0, "NONE", "NONE", 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, false, false, false, -70, "telemetry-1", false
 };
 
 // =============================================================================
-// TELEMETRY TRANSMISSION ENGINE
+// 3. BACKGROUND WIFI + HTTPS POST WORKER (Runs on Core 0)
 // =============================================================================
-inline bool sendTelemetry(const NanogridTelemetry& t, bool enforceInterval = true) {
-    static unsigned long lastSentMs = 0;
+inline void _telemetryWorkerTask(void* parameter) {
+  unsigned long lastPostMs = 0;
+  unsigned long lastWifiAttemptMs = 0;
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  lastWifiAttemptMs = millis();
+
+  for (;;) {
     unsigned long now = millis();
 
-    // Enforce 3-second pacing unless explicit override
-    if (enforceInterval && (now - lastSentMs < TELEMETRY_INTERVAL_MS)) {
-        return false;
-    }
-
+    // Non-blocking WiFi reconnect check every 10s
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[Telemetry] WiFi not connected. Skipping packet.");
-        return false;
+      if (now - lastWifiAttemptMs >= WIFI_RETRY_INTERVAL_MS) {
+        lastWifiAttemptMs = now;
+        WiFi.disconnect();
+        WiFi.begin(WIFI_SSID, WIFI_PASS);
+      }
+      vTaskDelay(pdMS_TO_TICKS(250));
+      continue;
     }
 
-    // Allocate JSON buffer
-    char jsonBuffer[512];
-    int len = snprintf(
+    // Post every 3 seconds when connected and data is ready
+    if (_latestTelemetry.hasData && (now - lastPostMs >= TELEMETRY_INTERVAL_MS)) {
+      lastPostMs = now;
+
+      // Copy snapshot quickly
+      NanogridTelemetry snap;
+      while (_telemetryLock) { taskYIELD(); }
+      memcpy(&snap, (const void*)&_latestTelemetry, sizeof(NanogridTelemetry));
+
+      snap.uptime_s = millis() / 1000UL;
+      snap.rssi = (int16_t)WiFi.RSSI();
+
+      char jsonBuffer[512];
+      int len = snprintf(
         jsonBuffer,
         sizeof(jsonBuffer),
         "{"
@@ -113,63 +118,95 @@ inline bool sendTelemetry(const NanogridTelemetry& t, bool enforceInterval = tru
         "\"rssi\":%d,"
         "\"fw\":\"%s\""
         "}",
-        t.node,
-        (unsigned long)t.uptime_s,
-        (t.src && strlen(t.src) > 0) ? t.src : "NONE",
-        (t.tie && strlen(t.tie) > 0) ? t.tie : "NONE",
-        t.soc,
-        t.vbat,
-        t.ibat,
-        t.vpv,
-        t.ipv,
-        t.vbus,
-        t.ibus,
-        t.pv_ok ? "true" : "false",
-        t.lockout ? "true" : "false",
-        t.import_bus_ok ? "true" : "false",
-        t.rssi != 0 ? t.rssi : (int16_t)WiFi.RSSI(),
-        (t.fw && strlen(t.fw) > 0) ? t.fw : "v1.0.0"
-    );
+        snap.node,
+        (unsigned long)snap.uptime_s,
+        snap.src,
+        snap.tie,
+        snap.soc,
+        snap.vbat,
+        snap.ibat,
+        snap.vpv,
+        snap.ipv,
+        snap.vbus,
+        snap.ibus,
+        snap.pv_ok ? "true" : "false",
+        snap.lockout ? "true" : "false",
+        snap.import_bus_ok ? "true" : "false",
+        snap.rssi,
+        snap.fw
+      );
 
-    if (len < 0 || len >= (int)sizeof(jsonBuffer)) {
-        Serial.println("[Telemetry] Error: JSON buffer overflow.");
-        return false;
+      if (len > 0 && len < (int)sizeof(jsonBuffer)) {
+        WiFiClientSecure client;
+        client.setInsecure(); // Skip root CA bundle overhead on ESP32
+        HTTPClient http;
+        http.setTimeout(3500);
+
+        if (http.begin(client, INGEST_URL)) {
+          http.addHeader("Content-Type", "application/json");
+          http.addHeader("X-Device-Key", DEVICE_KEY);
+          int code = http.POST((uint8_t*)jsonBuffer, strlen(jsonBuffer));
+          http.end();
+          (void)code;
+        }
+      }
     }
 
-    HTTPClient http;
-    bool success = false;
-    bool isHttps = (strncmp(INGEST_URL, "https://", 8) == 0);
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
 
-    if (isHttps) {
-        WiFiClientSecure secureClient;
-        // Supabase uses public Let's Encrypt / DigiCert certificates.
-        // setInsecure() skips strict root CA bundle validation on memory-constrained MCU.
-        secureClient.setInsecure();
-        http.begin(secureClient, INGEST_URL);
-    } else {
-        WiFiClient standardClient;
-        http.begin(standardClient, INGEST_URL);
-    }
+// =============================================================================
+// 4. PUBLIC API FOR YOUR .INO SKETCH
+// =============================================================================
 
-    // Configure headers and timeout
-    http.setTimeout(4000); // 4 second network timeout
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Device-Key", DEVICE_KEY);
+// Call once at the end of setup()
+inline void telemetryInit() {
+  xTaskCreatePinnedToCore(
+    _telemetryWorkerTask,
+    "NanogridTelemetry",
+    8192,
+    NULL,
+    1,
+    NULL,
+    0 // Pin to Core 0 so Core 1 (loop) is never delayed
+  );
+}
 
-    // Send HTTP POST
-    int httpResponseCode = http.POST((uint8_t*)jsonBuffer, strlen(jsonBuffer));
-
-    if (httpResponseCode >= 200 && httpResponseCode < 300) {
-        Serial.printf("[Telemetry] Node %u packet ACK (HTTP %d)\n", t.node, httpResponseCode);
-        lastSentMs = now;
-        success = true;
-    } else {
-        String responseBody = http.getString();
-        Serial.printf("[Telemetry] Node %u FAILED (HTTP %d): %s\n", t.node, httpResponseCode, responseBody.c_str());
-    }
-
-    http.end();
-    return success;
+// Call inside loop() — takes < 10 microseconds, never blocks
+inline void telemetryUpdate(
+  uint8_t node,
+  const char* src,
+  const char* tie,
+  float soc,
+  float vbat,
+  float ibat,
+  float vpv,
+  float ipv,
+  float vbus,
+  float ibus,
+  bool pv_ok,
+  bool lockout,
+  bool import_bus_ok
+) {
+  _telemetryLock = true;
+  _latestTelemetry.node = node;
+  strncpy(_latestTelemetry.src, src ? src : "NONE", sizeof(_latestTelemetry.src) - 1);
+  _latestTelemetry.src[sizeof(_latestTelemetry.src) - 1] = '\0';
+  strncpy(_latestTelemetry.tie, tie ? tie : "NONE", sizeof(_latestTelemetry.tie) - 1);
+  _latestTelemetry.tie[sizeof(_latestTelemetry.tie) - 1] = '\0';
+  _latestTelemetry.soc = soc;
+  _latestTelemetry.vbat = vbat;
+  _latestTelemetry.ibat = ibat;
+  _latestTelemetry.vpv = vpv;
+  _latestTelemetry.ipv = ipv;
+  _latestTelemetry.vbus = vbus;
+  _latestTelemetry.ibus = ibus;
+  _latestTelemetry.pv_ok = pv_ok;
+  _latestTelemetry.lockout = lockout;
+  _latestTelemetry.import_bus_ok = import_bus_ok;
+  _latestTelemetry.hasData = true;
+  _telemetryLock = false;
 }
 
 #endif // NANOGRID_TELEMETRY_H

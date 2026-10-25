@@ -5,6 +5,7 @@
 
 # ESP32 private credentials
 esp32/telemetry.h
+**/telemetry.h
 
 # Node dependencies and build outputs
 node_modules/
