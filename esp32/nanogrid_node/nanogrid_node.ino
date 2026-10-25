@@ -105,7 +105,7 @@
 // ---------------------------------------------------------------------
 // Configuration — edit per node
 // ---------------------------------------------------------------------
-#define NODE_ID              1
+#define NODE_ID              2
 #define PIN_RELAY_PV         25   // Relay A
 #define PIN_RELAY_BATT       26   // Relay B
 #define PIN_RELAY_TX         27   // Relay C

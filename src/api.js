@@ -326,7 +326,23 @@ class TelemetryService {
     const rawTime = raw.received_at || raw.timestamp || raw.created_at;
     const timestamp = rawTime || new Date().toISOString();
     const serverRecTime = rawTime ? new Date(rawTime).getTime() : Date.now();
-    const local_received_at = !isNaN(serverRecTime) ? serverRecTime : Date.now();
+
+    const prevNode = this.nodes[nodeId];
+    const isFirstFetch = !this.hasReceivedLive[nodeId];
+    const isNewPacket = !prevNode || prevNode.timestamp !== timestamp;
+
+    let local_received_at;
+    if (isFirstFetch) {
+      // On initial page load, if packet is recent (< 4s taking clock skew into account), treat as fresh (0s)
+      const rawAgeMs = Date.now() - (!isNaN(serverRecTime) ? serverRecTime : Date.now());
+      local_received_at = rawAgeMs < 4000 ? Date.now() : serverRecTime;
+    } else if (isNewPacket) {
+      // A brand-new telemetry packet arrived from the ESP32
+      local_received_at = Date.now();
+    } else {
+      // Same packet as previous poll (ESP32 hasn't posted a newer one yet) — preserve age counter
+      local_received_at = prevNode.local_received_at || serverRecTime;
+    }
 
     const normalized = {
       node_id: nodeId,

@@ -921,11 +921,12 @@ body {
 }
 
 .soc-number {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #FFFFFF;
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 .soc-label {

@@ -192,7 +192,7 @@ function renderNodeCard(nodeId, data, historyList) {
   if (!cardEl) return;
 
   const now = Date.now();
-  const ageSeconds = Math.max(0, Math.round((now - (data.local_received_at || now)) / 1000));
+  const ageSeconds = Math.max(0, Math.floor((now - (data.local_received_at || now)) / 1000));
 
   // Freshness & Dimming States
   const freshnessText = document.getElementById(`${prefix}Freshness`);
@@ -302,7 +302,7 @@ function renderNodeCard(nodeId, data, historyList) {
   const batPowerEl = document.getElementById(`${prefix}BatPower`);
 
   const soc = Math.max(0, Math.min(100, data.soc));
-  if (socValue) socValue.textContent = `${Math.round(soc)}%`;
+  if (socValue) socValue.textContent = `${soc.toFixed(1)}%`;
 
   // Stroke Dasharray: 2 * PI * 45 ≈ 282.743
   const circumference = 282.743;
@@ -613,7 +613,7 @@ function initTicker() {
     [1, 2].forEach(id => {
       const node = state.nodes[id];
       if (node) {
-        const age = Math.max(0, Math.round((now - (node.local_received_at || now)) / 1000));
+        const age = Math.max(0, Math.floor((now - (node.local_received_at || now)) / 1000));
         const el = document.getElementById(`node${id}Freshness`);
         if (el) el.textContent = `Updated ${age}s ago`;
 
