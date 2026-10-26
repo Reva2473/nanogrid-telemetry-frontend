@@ -31,6 +31,10 @@
         -moz-osx-font-smoothing: grayscale;
         overflow-x: hidden;
       }
+      html[data-theme="light"], html[data-theme="light"] body {
+        background-color: #F8FAFC;
+        color: #0F172A;
+      }
     </style>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
@@ -76,6 +80,21 @@
 
           <!-- System Status Pill & Demo/Live Toggle -->
           <div class="top-nav-actions">
+            <!-- Theme Toggle Button (Dark / Light) -->
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="Switch between Dark and Light mode" aria-label="Toggle Dark/Light Theme">
+              <svg id="themeIconSun" class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+              <svg id="themeIconMoon" class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+              <span class="theme-label" id="themeLabelText">Dark</span>
+            </button>
+
             <!-- Mode Toggle Pill (Demo vs Live) -->
             <button class="mode-toggle-btn" id="modeToggleBtn" title="Switch between Demo Simulation and Live Backend Polling">
               <span class="mode-indicator-dot"></span>
@@ -728,6 +747,16 @@
                 <canvas id="chartCanvasVbat"></canvas>
                 <div class="chart-tooltip" id="tooltipVbat" style="display: none;"></div>
               </div>
+              <div class="chart-card-footer">
+                <button class="chart-download-btn" id="downloadVbatBtn" title="Download graph as PNG">
+                  <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  <span>Download PNG</span>
+                </button>
+              </div>
             </div>
 
             <!-- Chart 2: State of Charge (soc, % estimated) -->
@@ -745,6 +774,16 @@
               <div class="chart-canvas-container" id="canvasWrapSoc">
                 <canvas id="chartCanvasSoc"></canvas>
                 <div class="chart-tooltip" id="tooltipSoc" style="display: none;"></div>
+              </div>
+              <div class="chart-card-footer">
+                <button class="chart-download-btn" id="downloadSocBtn" title="Download graph as PNG">
+                  <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  <span>Download PNG</span>
+                </button>
               </div>
             </div>
 
@@ -764,6 +803,16 @@
                 <canvas id="chartCanvasVbus"></canvas>
                 <div class="chart-tooltip" id="tooltipVbus" style="display: none;"></div>
               </div>
+              <div class="chart-card-footer">
+                <button class="chart-download-btn" id="downloadVbusBtn" title="Download graph as PNG">
+                  <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  <span>Download PNG</span>
+                </button>
+              </div>
             </div>
 
             <!-- Chart 4: Battery Net Current (ibat, A) -->
@@ -781,6 +830,16 @@
               <div class="chart-canvas-container" id="canvasWrapIbat">
                 <canvas id="chartCanvasIbat"></canvas>
                 <div class="chart-tooltip" id="tooltipIbat" style="display: none;"></div>
+              </div>
+              <div class="chart-card-footer">
+                <button class="chart-download-btn" id="downloadIbatBtn" title="Download graph as PNG">
+                  <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  <span>Download PNG</span>
+                </button>
               </div>
             </div>
 

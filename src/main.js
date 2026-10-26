@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
   initMobileSwitcher();
   initCharts();
+  initThemeToggle();
   initApiModal();
   initTicker();
 
@@ -144,6 +145,23 @@ function initCharts() {
     colorNode2: '#EC4899',
     timeRange: activeTimeRange,
     decimals: 3
+  });
+
+  // Chart PNG Download Actions
+  document.getElementById('downloadVbatBtn')?.addEventListener('click', () => {
+    chartVbat?.downloadPng('battery-voltage-vbat.png', 'Battery Voltage (V_bat)');
+  });
+
+  document.getElementById('downloadSocBtn')?.addEventListener('click', () => {
+    chartSoc?.downloadPng('state-of-charge-soc.png', 'State of Charge (SOC % Estimated)');
+  });
+
+  document.getElementById('downloadVbusBtn')?.addEventListener('click', () => {
+    chartVbus?.downloadPng('shared-bus-voltage-vbus.png', 'Shared Inter-Tie Bus Voltage (V_bus)');
+  });
+
+  document.getElementById('downloadIbatBtn')?.addEventListener('click', () => {
+    chartIbat?.downloadPng('battery-net-current-ibat.png', 'Battery Net Current (I_bat)');
   });
 }
 
@@ -723,5 +741,62 @@ function initApiModal() {
       lockout: false,
       timestamp: new Date().toISOString()
     });
+  });
+}
+
+/**
+ * Theme Toggle (Light / Dark Mode)
+ */
+function initThemeToggle() {
+  const toggleBtn = document.getElementById('themeToggleBtn');
+  const labelText = document.getElementById('themeLabelText');
+  const sunIcon = document.getElementById('themeIconSun');
+  const moonIcon = document.getElementById('themeIconMoon');
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const isLight = theme === 'light';
+
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('light-active', isLight);
+      toggleBtn.setAttribute('title', isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode');
+    }
+
+    if (labelText) {
+      labelText.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+    }
+
+    if (sunIcon) {
+      sunIcon.style.display = isLight ? 'none' : 'inline-block';
+    }
+    if (moonIcon) {
+      moonIcon.style.display = isLight ? 'inline-block' : 'none';
+    }
+
+    // Re-render telemetry charts with the active theme colors
+    chartVbat?.render();
+    chartSoc?.render();
+    chartVbus?.render();
+    chartIbat?.render();
+  }
+
+  let savedTheme = 'dark';
+  try {
+    savedTheme = localStorage.getItem('nanogrid_theme') || 'dark';
+  } catch (e) {
+    console.warn('Unable to read nanogrid_theme from localStorage:', e);
+  }
+
+  applyTheme(savedTheme);
+
+  toggleBtn?.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+    try {
+      localStorage.setItem('nanogrid_theme', nextTheme);
+    } catch (e) {
+      console.warn('Unable to save nanogrid_theme to localStorage:', e);
+    }
+    applyTheme(nextTheme);
   });
 }

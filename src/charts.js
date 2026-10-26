@@ -125,17 +125,19 @@ export class TelemetryChart {
     const w = this.width;
     const h = this.height;
 
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+
     ctx.clearRect(0, 0, w, h);
 
     const s1 = this.filterByRange(this.dataNode1);
     const s2 = this.filterByRange(this.dataNode2);
 
     if (s1.length === 0 && s2.length === 0) {
-      this.renderEmptyState(ctx, w, h);
+      this.renderEmptyState(ctx, w, h, isLight);
       return;
     }
 
-    const padding = { top: 16, right: 16, bottom: 26, left: 38 };
+    const padding = { top: 16, right: 16, bottom: 42, left: 38 };
     const chartW = w - padding.left - padding.right;
     const chartH = h - padding.top - padding.bottom;
 
@@ -146,7 +148,7 @@ export class TelemetryChart {
     ].filter(v => v !== null && !isNaN(v));
 
     if (allVals.length === 0) {
-      this.renderEmptyState(ctx, w, h);
+      this.renderEmptyState(ctx, w, h, isLight);
       return;
     }
 
@@ -166,7 +168,7 @@ export class TelemetryChart {
     // Gridlines and Y axis labels
     const gridLines = 4;
     ctx.font = '10px Inter, monospace';
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = isLight ? '#475569' : '#64748B';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
 
@@ -176,7 +178,7 @@ export class TelemetryChart {
       const val = minVal + (maxVal - minVal) * yNorm;
 
       ctx.beginPath();
-      ctx.strokeStyle = '#1E2733';
+      ctx.strokeStyle = isLight ? '#E2E8F0' : '#1E2733';
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
       ctx.moveTo(padding.left, y);
@@ -196,6 +198,8 @@ export class TelemetryChart {
     const minTime = maxTime - timeSpan;
 
     // Format X labels
+    ctx.font = '10px Inter, monospace';
+    ctx.fillStyle = isLight ? '#475569' : '#64748B';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const xLabels = 4;
@@ -207,6 +211,15 @@ export class TelemetryChart {
       const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       ctx.fillText(timeStr, x, h - padding.bottom + 8);
     }
+
+    // Centered X-axis "Time" label below timestamp tick labels
+    ctx.save();
+    ctx.font = '600 11px Inter, sans-serif';
+    ctx.fillStyle = isLight ? '#334155' : '#94A3B8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Time', padding.left + chartW / 2, h - 10);
+    ctx.restore();
 
     const getX = (t) => padding.left + ((t - minTime) / timeSpan) * chartW;
     const getY = (val) => padding.top + chartH * (1 - (val - minVal) / (maxVal - minVal));
@@ -263,7 +276,7 @@ export class TelemetryChart {
       // Draw vertical crosshair line
       ctx.save();
       ctx.beginPath();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.3)' : 'rgba(255, 255, 255, 0.35)';
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
       ctx.moveTo(x, padding.top);
@@ -340,7 +353,7 @@ export class TelemetryChart {
   updateTooltip(x) {
     if (!this.tooltip || !this.canvas) return;
 
-    const padding = { top: 16, right: 16, bottom: 26, left: 38 };
+    const padding = { top: 16, right: 16, bottom: 42, left: 38 };
     const chartW = this.width - padding.left - padding.right;
     if (chartW <= 0) return;
 
@@ -378,12 +391,144 @@ export class TelemetryChart {
     this.tooltip.style.display = 'block';
   }
 
-  renderEmptyState(ctx, w, h) {
+  renderEmptyState(ctx, w, h, isLight = false) {
     ctx.font = '12px Inter, sans-serif';
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = isLight ? '#475569' : '#64748B';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('Waiting for telemetry stream...', w / 2, h / 2);
+  }
+
+  /**
+   * Export high-resolution PNG with header metadata and legend
+   */
+  downloadPng(filename = 'chart.png', titleText = '') {
+    if (!this.canvas) return;
+
+    // Temporarily clear scrubbing crosshair to ensure a clean chart export
+    const prevScrub = this.scrubbingX;
+    if (prevScrub !== null) {
+      this.scrubbingX = null;
+      this.render();
+    }
+
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const dpr = window.devicePixelRatio || 1;
+    const headerH = 44;
+    const totalW = this.width;
+    const totalH = this.height + headerH;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = Math.round(totalW * dpr);
+    offscreen.height = Math.round(totalH * dpr);
+
+    const octx = offscreen.getContext('2d');
+    if (!octx) return;
+
+    octx.scale(dpr, dpr);
+
+    // 1. Solid background so exported PNG is never transparent (#FFFFFF in light, #090C10 in dark)
+    octx.fillStyle = isLight ? '#FFFFFF' : '#090C10';
+    octx.fillRect(0, 0, totalW, totalH);
+
+    // 2. Draw Header Area (44px tall)
+    // 2a. Title Text on top-left
+    if (titleText) {
+      octx.save();
+      octx.font = '600 13px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      octx.fillStyle = isLight ? '#0F172A' : '#F8FAFC';
+      octx.textAlign = 'left';
+      octx.textBaseline = 'middle';
+      octx.fillText(titleText, 16, headerH / 2);
+      octx.restore();
+    }
+
+    // 2b. Compact Legend & Range on top-right
+    octx.save();
+    octx.font = '500 11px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    octx.textBaseline = 'middle';
+
+    const rangeStr = `Range: ${this.timeRange}`;
+    const n2Str = 'Node 2 (Dashed)';
+    const n1Str = 'Node 1 (Solid)';
+
+    const rangeWidth = octx.measureText(rangeStr).width;
+    const n2Width = octx.measureText(n2Str).width;
+    const n1Width = octx.measureText(n1Str).width;
+
+    const swatchLen = 14;
+    const gap = 6;
+    const itemGap = 16;
+
+    let curX = totalW - 16;
+
+    // Draw Range info
+    octx.textAlign = 'right';
+    octx.fillStyle = isLight ? '#64748B' : '#94A3B8';
+    octx.fillText(rangeStr, curX, headerH / 2);
+    curX -= (rangeWidth + itemGap);
+
+    // Draw Node 2 (Dashed)
+    octx.textAlign = 'right';
+    octx.fillStyle = this.colorNode2;
+    octx.fillText(n2Str, curX, headerH / 2);
+    curX -= (n2Width + gap);
+
+    octx.strokeStyle = this.colorNode2;
+    octx.lineWidth = 2;
+    octx.setLineDash([4, 3]);
+    octx.beginPath();
+    octx.moveTo(curX - swatchLen, headerH / 2);
+    octx.lineTo(curX, headerH / 2);
+    octx.stroke();
+    curX -= (swatchLen + itemGap);
+
+    // Draw Node 1 (Solid)
+    octx.textAlign = 'right';
+    octx.fillStyle = this.colorNode1;
+    octx.fillText(n1Str, curX, headerH / 2);
+    curX -= (n1Width + gap);
+
+    octx.strokeStyle = this.colorNode1;
+    octx.lineWidth = 2;
+    octx.setLineDash([]);
+    octx.beginPath();
+    octx.moveTo(curX - swatchLen, headerH / 2);
+    octx.lineTo(curX, headerH / 2);
+    octx.stroke();
+
+    // Subtle divider line under header
+    octx.strokeStyle = isLight ? '#E2E8F0' : '#1E2733';
+    octx.lineWidth = 1;
+    octx.setLineDash([]);
+    octx.beginPath();
+    octx.moveTo(0, headerH);
+    octx.lineTo(totalW, headerH);
+    octx.stroke();
+
+    octx.restore();
+
+    // 3. Draw chart canvas below header
+    octx.drawImage(this.canvas, 0, headerH, totalW, this.height);
+
+    // 4. Trigger automatic browser download
+    try {
+      const dataUrl = offscreen.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.download = filename || 'chart.png';
+      downloadLink.href = dataUrl;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    } catch (err) {
+      console.error('Failed to export chart PNG:', err);
+    }
+
+    // Restore scrubbing state if it was active
+    if (prevScrub !== null) {
+      this.scrubbingX = prevScrub;
+      this.render();
+    }
   }
 }
 
