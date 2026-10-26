@@ -1698,6 +1698,59 @@ html[data-theme="light"] .node-card {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
+html[data-theme="light"] .node-card.node-delayed {
+  opacity: 1;
+  border-color: #F59E0B;
+}
+
+html[data-theme="light"] .node-card.node-offline {
+  opacity: 1;
+  border-color: rgba(220, 38, 38, 0.55);
+}
+
+html[data-theme="light"] .amber-warning-banner {
+  background: #FEF3C7;
+  border: 1px solid #D97706;
+  color: #78350F;
+  font-weight: 700;
+}
+
+html[data-theme="light"] .amber-warning-banner .banner-icon {
+  stroke: #B45309;
+}
+
+html[data-theme="light"] .offline-banner {
+  background: #FEE2E2;
+  border: 1px solid #DC2626;
+  color: #7F1D1D;
+  font-weight: 700;
+}
+
+html[data-theme="light"] .offline-dot {
+  background: #DC2626;
+}
+
+html[data-theme="light"] .badge-live,
+html[data-theme="light"] .status-live {
+  background: #D1FAE5;
+  color: #065F46;
+  border-color: #10B981;
+}
+
+html[data-theme="light"] .badge-delayed,
+html[data-theme="light"] .status-delayed {
+  background: #FEF3C7;
+  color: #92400E;
+  border-color: #F59E0B;
+}
+
+html[data-theme="light"] .badge-offline,
+html[data-theme="light"] .status-offline {
+  background: #FEE2E2;
+  color: #991B1B;
+  border-color: #EF4444;
+}
+
 html[data-theme="light"] .node-card-title {
   color: var(--text-main);
 }
